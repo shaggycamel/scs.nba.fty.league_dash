@@ -89,7 +89,7 @@ hf_runtime() {
 # serves a stale image; this detects that and forces a factory reboot, then
 # keeps waiting. Returns non-zero if it never converges.
 hf_wait_healthy() {
-  local repo="$1" expected="$2" timeout="${3:-900}"
+  local repo="$1" expected="$2" timeout="${3:-900}" grace="${HF_HEAL_GRACE:-90}"
   local waited=0 healed=0 runtime sha stage
 
   while [ "$waited" -lt "$timeout" ]; do
@@ -101,7 +101,9 @@ hf_wait_healthy() {
       return 0
     fi
 
-    if [ "$waited" -ge 60 ] && [ "$healed" = "0" ]; then
+    # Only heal a Space that is up but stuck on its previous commit. While it is
+    # BUILDING, leave it alone so we do not interrupt an in-flight rebuild.
+    if [ "$stage" = "RUNNING" ] && [ "$waited" -ge "$grace" ] && [ "$healed" = "0" ]; then
       echo "[hf] WARN: ${repo} still on ${sha:-?} (${stage:-?}), expected ${expected:-?}; forcing factory reboot" >&2
       curl -sf -X POST "https://huggingface.co/api/spaces/${repo}/restart?factory=true" \
         -H "Authorization: Bearer ${HUGGINGFACE_TOKEN}" >/dev/null 2>&1 || true
