@@ -2,6 +2,7 @@
 export(db_connect)
 export(handoff_query)
 export(hash_password)
+export(nba_season)
 export(nba_theme)
 export(handoff_secret)
 export(sign_handoff_token)

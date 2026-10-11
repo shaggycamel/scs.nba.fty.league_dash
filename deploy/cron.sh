@@ -51,7 +51,9 @@ DOCKERHUB_USER="${DOCKERHUB_USER:-shaggycamel}"
 IMAGE_NAME="scs.nba.fty.league_dash"
 BASE_IMAGE="scs.nba.fty.league_dash_base:latest"
 TAG="${TAG:-latest}"
-SEASON="${NBA_SEASON:-2025-26}"
+# Season: pass NBA_SEASON through if set; otherwise leave it unset so the R
+# default in core::nba_season() applies (one source of truth for the default).
+SEASON="${NBA_SEASON:-}"
 EXCLUDE_LEAGUES="${EXCLUDE_LEAGUES:-}"
 DRY_RUN="${DRY_RUN:-0}"
 REBUILD_BASE="${REBUILD_BASE:-0}"
@@ -194,11 +196,11 @@ if [ "$DRY_RUN" != "1" ]; then
   echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin || exit 1
 fi
 
-step "Fetching active leagues for season ${SEASON}"
+step "Fetching active leagues for season ${SEASON:-default}"
 LEAGUES="$(list_leagues)"
 
 if [ -z "$LEAGUES" ]; then
-  printf "⚠ No leagues found for season %s\n" "$SEASON"
+  printf "⚠ No leagues found for season %s\n" "${SEASON:-default}"
   exit 1
 fi
 

@@ -6,7 +6,7 @@
 source(here::here("data-raw", "_setup.R"))
 source(here::here("R", "utils_database.R"))
 
-season <- Sys.getenv("NBA_SEASON", "2025-26")
+season <- core::nba_season()
 con <- db_connect(Sys.getenv("NBA_DB_SECTION", "cockroach-read"))
 on.exit(DBI::dbDisconnect(con), add = TRUE)
 

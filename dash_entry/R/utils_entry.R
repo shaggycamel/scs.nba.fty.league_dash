@@ -1,9 +1,9 @@
 #' Current season
 #'
-#' @return The season string, from `NBA_SEASON` (default `"2025-26"`).
+#' @return The season string, from [core::nba_season()].
 #' @export
 entry_season <- function() {
-  Sys.getenv("NBA_SEASON", "2025-26")
+  core::nba_season()
 }
 
 #' Open the entry point's database connection

@@ -35,7 +35,7 @@ Read this whole file before running anything. Prefer `DRY_RUN=1` first.
   - `DOCKERHUB_TOKEN` — Docker Hub push token (required).
   - `HUGGINGFACE_TOKEN` — HF token with **write** access to the Spaces (required).
   - `DOCKERHUB_USER` (default `shaggycamel`), `NBA_HF_OWNER` (default `shaggycamel`),
-    `NBA_SEASON` (default `2025-26`).
+    `NBA_SEASON` (optional; the default lives in `core::nba_season()`).
 
   Create it once (git-ignored, never commit):
   ```bash
