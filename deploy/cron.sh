@@ -9,15 +9,28 @@
 #
 # Run this directly (cronjobs run `deploy/cron.sh`). The entry-point container is
 # deployed only when BUILD_ENTRY=1, since rebuilding it restarts the entry Space.
+# SKIP_BASE=1 reuses the cached shared NBA base for fantasy-only refresh runs.
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
 set -uo pipefail
 
+# cron provides a minimal PATH and no lock of its own; make docker/flock
+# resolvable and serialise runs so a slow multi-league rebuild cannot overlap
+# the next tick (mirrors the database cron).
+export PATH=/usr/local/bin:/usr/bin:/bin
+
 # Work from the repo root regardless of the invoking cwd (this script lives in
 # deploy/, so the repo root is its parent directory)
 REPO_DIR="${REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)}"
 cd "$REPO_DIR" || exit 1
+
+LOCK_FILE="${LOCK_FILE:-${TMPDIR:-/tmp}/scs.nba.fty.league_dash.lock}"
+exec 9>"$LOCK_FILE"
+if ! flock -w 3600 9; then
+  printf 'Another run is still in progress after 1h; skipping this tick.\n' >&2
+  exit 1
+fi
 
 # Deploy secrets (DOCKERHUB_TOKEN, HUGGINGFACE_TOKEN, ...). Resolved after the cd so
 # it is the repo's own file, not whatever $HOME happened to hold: the previous
@@ -44,6 +57,10 @@ DRY_RUN="${DRY_RUN:-0}"
 REBUILD_BASE="${REBUILD_BASE:-0}"
 BUILD_ENTRY="${BUILD_ENTRY:-0}"
 PROVISION="${PROVISION:-0}"
+# SKIP_BASE=1 reuses the cached NBA base (data-raw/cache/base.rda) instead of
+# regenerating it, for fantasy-only refresh runs between the daily base build.
+SKIP_BASE="${SKIP_BASE:-0}"
+BASE_CACHE="${BASE_CACHE:-${REPO_DIR}/dash_league/data-raw/cache/base.rda}"
 
 DOCKERHUB_TOKEN="${DOCKERHUB_TOKEN:-}"
 HUGGINGFACE_TOKEN="${HUGGINGFACE_TOKEN:-}"
@@ -163,8 +180,15 @@ build_base || exit 1
 if [ "$DRY_RUN" != "1" ]; then
   : "${DOCKERHUB_TOKEN:?DOCKERHUB_TOKEN not set}"
 
-  step "Generating shared NBA base (in ${R_IMAGE})"
-  run_r Rscript ./data-raw/_generate_base.R || exit 1
+  if [ "$SKIP_BASE" = "1" ] && [ -f "$BASE_CACHE" ]; then
+    step "Reusing cached NBA base (SKIP_BASE=1): ${BASE_CACHE}"
+  else
+    if [ "$SKIP_BASE" = "1" ]; then
+      printf '⚠ SKIP_BASE=1 but no base cache at %s; generating base\n' "$BASE_CACHE" >&2
+    fi
+    step "Generating shared NBA base (in ${R_IMAGE})"
+    run_r Rscript ./data-raw/_generate_base.R || exit 1
+  fi
 
   step "Logging in to Docker Hub"
   echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin || exit 1
