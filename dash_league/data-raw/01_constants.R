@@ -5,9 +5,9 @@ cur_season <- core::nba_season()
 prev_season <- str_replace_all(cur_season, "\\d+", \(x) as.character(as.integer(x) - 1))
 last_update <-
   tbl(db_con, I("util.update_log")) |>
-  filter(successful_run) |>
-  summarise(process_date = max(process_date)) |>
+  filter(success) |>
+  summarise(task_time = max(task_time)) |>
   as_tibble() |>
-  pull(process_date)
+  pull(task_time)
 
 usethis::use_data(cur_date, last_update, overwrite = TRUE)
