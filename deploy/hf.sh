@@ -15,21 +15,72 @@ adapter_url() {
   echo "https://${HF_OWNER}-${1}.hf.space"
 }
 
-# Commit the Space's Dockerfile with a fresh cache-busting build arg. HF only
-# rebuilds a Docker Space when its repository changes, and a bare restart keeps
-# serving the previously built image -- so a freshly pushed :latest is otherwise
-# never picked up. The changing ARG/RUN makes every deploy a real repo change,
-# forcing the rebuild that re-pulls the image. library() is required so LazyData
-# objects (e.g. ls_nba_teams) are attached.
+# Resolve an image tag to its immutable digest (repo@sha256:...) via the Docker
+# Hub registry API. Pinning the digest is what guarantees the Space is never
+# served a stale image: a `FROM image:latest` can hit a cached layer, but a
+# digest is content-addressed, so a changed image (new data baked into every
+# league build) forces a real pull. Falls back to the tag as-is if the registry
+# can't be reached, so a deploy never hard-fails on this.
+hf_image_ref() {
+  local image="$1"
+
+  case "$image" in
+    *@sha256:*) printf '%s' "$image"; return 0 ;;
+  esac
+
+  local repo tag
+  repo="${image%:*}"
+  tag="${image##*:}"
+  if [ "$tag" = "$image" ]; then tag="latest"; fi
+
+  # Docker Hub registry path (bare names live under library/).
+  local path="$repo"
+  case "$repo" in
+    */*) ;;
+    *) path="library/$repo" ;;
+  esac
+
+  local token
+  token="$(curl -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:${path}:pull" \
+    | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')"
+  if [ -z "$token" ]; then printf '%s' "$image"; return 0; fi
+
+  local digest
+  digest="$(curl -sI \
+    -H "Authorization: Bearer ${token}" \
+    -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+    -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" \
+    -H "Accept: application/vnd.oci.image.manifest.v1+json" \
+    -H "Accept: application/vnd.oci.image.index.v1+json" \
+    "https://registry-1.docker.io/v2/${path}/manifests/${tag}" \
+    | sed -n 's/^[Dd]ocker-[Cc]ontent-[Dd]igest:[[:space:]]*\(.*\)\r*$/\1/p')"
+
+  if [ -n "$digest" ]; then
+    printf '%s@%s' "${repo}" "${digest}"
+  else
+    echo "[hf] WARN: could not resolve a digest for ${image}; using the tag (may serve a stale build)" >&2
+    printf '%s' "$image"
+  fi
+}
+
+# Commit the Space's Dockerfile pinned to the pushed image's digest, with a
+# fresh cache-busting build arg. HF only rebuilds a Docker Space when its
+# repository changes, and a bare restart keeps serving the previously built
+# image -- so a freshly pushed image is otherwise never picked up. The digest pin
+# (never stale) plus the changing ARG/RUN (always a repo change) together force a
+# clean rebuild. library() is required so LazyData objects are attached.
 hf_configure_space() {
   local repo="$1"
   local image="$2"
   local app="$3"
 
+  local image_ref
+  image_ref="$(hf_image_ref "$image")"
+
   local stamp
   stamp="$(date -u +%Y%m%dT%H%M%SZ)-${RANDOM}${RANDOM}"
 
-  local df_json="FROM ${image}\\nARG SPACE_REBUILD=${stamp}\\nRUN echo \\\"space rebuild ${stamp}\\\"\\nEXPOSE 7860\\nUSER rstudio\\nCMD [\\\"R\\\", \\\"-e\\\", \\\"options('shiny.port'=7860, 'shiny.host'='0.0.0.0'); library(${app}); ${app}::run_app()\\\"]"
+  local df_json="FROM ${image_ref}\\nARG SPACE_REBUILD=${stamp}\\nRUN echo \\\"space rebuild ${stamp}\\\"\\nEXPOSE 7860\\nUSER rstudio\\nCMD [\\\"R\\\", \\\"-e\\\", \\\"options('shiny.port'=7860, 'shiny.host'='0.0.0.0'); library(${app}); ${app}::run_app()\\\"]"
 
   printf '%s\n' \
     '{"key":"header","value":{"summary":"provision space"}}' \
@@ -38,6 +89,8 @@ hf_configure_space() {
       -H "Authorization: Bearer ${HUGGINGFACE_TOKEN}" \
       -H "Content-Type: application/x-ndjson" \
       --data-binary @- >/dev/null || return 1
+
+  echo "[hf] ${repo} -> ${image_ref}"
 }
 
 # Create the Space if missing, then configure its Dockerfile.
