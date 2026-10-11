@@ -20,8 +20,13 @@ app_ui <- function(request) {
        .shiny-spinner-output-container > .reactable {
          flex: 1 1 auto; min-height: 0;
        }
+       .navbar .navbar-brand {
+         position: relative; line-height: 1;
+       }
        .navbar .nav-last-update {
-         font-size: 0.75rem; font-weight: 400; opacity: 0.85;
+         position: absolute; left: 0; top: 100%;
+         font-size: 0.7rem; font-weight: 400; opacity: 0.85; line-height: 1;
+         white-space: nowrap;
        }"
     ))),
     page_navbar(
