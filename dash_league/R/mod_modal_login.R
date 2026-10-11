@@ -80,7 +80,7 @@ mod_modal_login_server <- function(
         showModal(
           modalDialog(
             tags$h4("Sign in required"),
-            "Open this dashboard from the NBA Shiny entry point.",
+            "Open this dashboard from the entry point.",
             easyClose = FALSE,
             footer = NULL
           )
