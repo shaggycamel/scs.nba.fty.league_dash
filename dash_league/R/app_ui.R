@@ -19,18 +19,23 @@ app_ui <- function(request) {
        .shiny-spinner-output-container > .r2d3,
        .shiny-spinner-output-container > .reactable {
          flex: 1 1 auto; min-height: 0;
+       }
+       .navbar .nav-last-update {
+         font-size: 0.75rem; font-weight: 400; opacity: 0.85;
        }"
     ))),
     page_navbar(
       id = "title_container",
       window_title = "NBA Fantasy",
-      title = uiOutput("navbar_title"),
+      title = tags$div(
+        uiOutput("navbar_title"),
+        uiOutput("nav_last_update")
+      ),
       nav_spacer(),
       nav_panel("Overview", mod_league_overview_ui("league_overview_1")),
       nav_panel("H2H", mod_h2h_ui("h2h_1")),
       nav_panel("Schedule", mod_schedule_table_ui("schedule_table_1")),
       nav_panel("Player Comparison", mod_player_comparison_ui("player_comparison_1")),
-      nav_item(uiOutput("nav_last_update")),
       nav_item(actionButton(
         "fty_league_competitor_switch",
         "League",
