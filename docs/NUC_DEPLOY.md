@@ -29,7 +29,8 @@ Read this whole file before running anything. Prefer `DRY_RUN=1` first.
 - Credentials INI exists: `~/.config/scs_hub_credentials.ini` with a
   `cockroach-read` section (and `postgres` for local). Generation defaults to
   `NBA_DB_SECTION=cockroach-read`. (No `psql` needed — leagues are listed via R in
-  the base image.)
+  the base image.) The dashboard update log also needs a `cockroach-write`
+  section, unless `NBA_UPDATE_LOG_SECTION` points elsewhere.
 - A `./.profile` on the nuc exports the tokens (the scripts source it
   automatically when run non-interactively; for a manual run, source it first):
   - `DOCKERHUB_TOKEN` — Docker Hub push token (required).
@@ -106,6 +107,11 @@ PROVISION=1 bash deploy/cron.sh
 
 # 5.2 Full run including the entry point (this restarts the entry Space).
 PROVISION=1 BUILD_ENTRY=1 bash deploy/cron.sh
+
+# 5.3 Cadence runs (as cron): a bare run is 'all'; the arg only labels the
+# util.update_log rows. daily builds the base, intraday reuses the cached base.
+PROVISION=1 bash deploy/cron.sh daily
+SKIP_BASE=1 PROVISION=1 bash deploy/cron.sh intraday
 ```
 
 `deploy/cron.sh` does, in order:
@@ -116,6 +122,32 @@ PROVISION=1 BUILD_ENTRY=1 bash deploy/cron.sh
    Failures are reported per league; the loop continues.
 3. `deploy/build_entry.sh` — builds/pushes/deploys `shaggycamel/scs.nba.fty.league_dash_entry:latest` —
    only when `BUILD_ENTRY=1` (rebuilding restarts the entry Space).
+
+### Dashboard update log
+
+Each stage appends `dashboard:*` rows to `util.update_log` (the same table
+`database/__main__.py` writes), so a run is auditable without reading the cron log:
+
+| `task` | Written |
+|--------------|---------|
+| `dashboard start` / `dashboard end` | Once per run (bookends); `end` is a failure unless the whole run succeeded |
+| `dashboard:base` | After the shared NBA base is (re)generated (not on `SKIP_BASE=1` reuse) |
+| `dashboard:<slug>` | Per league, e.g. `dashboard:espn-95537`; a failure carries the stage that broke |
+| `dashboard:entry` | When `BUILD_ENTRY=1` |
+
+The run's cadence argument is stamped on every row's `cadence` column
+(`daily`/`intraday`/`all`), mirroring `database/cron.sh`. Every row also carries
+`source` — this repo's name, derived from the checkout's git remote (override
+with `UPDATE_LOG_SOURCE`) — and `job_kickoff`, the run's start time, identical on
+all rows of a run so a run can be grouped. Logging is best-effort: a failed write
+only warns, and `DRY_RUN=1` skips it. It writes with the `cockroach-write`
+section (override with `NBA_UPDATE_LOG_SECTION`).
+
+> Since `core` gained `log_update()`, rebuild the base image once
+> (`REBUILD_BASE=1`) so the deploy containers have the new function; until then
+> the log writes warn and are skipped. The write includes `source` and
+> `job_kickoff`, so the target `util.update_log` must have those columns (see
+> `INSTRUCTIONS_update_log_source_kickoff.md` in the `database` repo).
 
 Individual stages (if you need to isolate a failure):
 

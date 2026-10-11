@@ -55,7 +55,10 @@ npm test
 
 `deploy/cron.sh` is the single deploy entry point (base image + one image per
 league; `BUILD_ENTRY=1` also rebuilds the entry Space). `deploy/build_entry.sh`
-does entry only.
+does entry only. It takes an optional cadence arg (`daily`/`intraday`, default
+`all`) and appends best-effort `dashboard:*` rows to `util.update_log` via
+`core::log_update()` (`cockroach-write`), each stamped with `source` (this repo's
+name, from the git remote) and `job_kickoff` (the run start).
 Always `DRY_RUN=1` first. Docker build context is the repo root; `.dockerignore`
 excludes `dash_league/{data,data-raw,dev,tests,man}`, `docs/`, and `e2e/`.
 Full runbook: `docs/NUC_DEPLOY.md` (load on demand — do not preload).
