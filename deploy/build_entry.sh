@@ -67,7 +67,7 @@ if [ "$PROVISION" = "1" ]; then
 fi
 
 step "Deploying entry point (${ENTRY_SLUG})"
-adapter_deploy "$ENTRY_SLUG" "$FULL_IMAGE" || fail "deploy"
+adapter_deploy "$ENTRY_SLUG" "$FULL_IMAGE" "entry" || fail "deploy"
 
 printf "  → %s\n" "$(adapter_url "$ENTRY_SLUG")"
 printf "\n✔ Entry point processed\n"
