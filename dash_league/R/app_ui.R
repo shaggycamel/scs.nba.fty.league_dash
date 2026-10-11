@@ -30,6 +30,7 @@ app_ui <- function(request) {
       nav_panel("H2H", mod_h2h_ui("h2h_1")),
       nav_panel("Schedule", mod_schedule_table_ui("schedule_table_1")),
       nav_panel("Player Comparison", mod_player_comparison_ui("player_comparison_1")),
+      nav_item(uiOutput("nav_last_update")),
       nav_item(actionButton(
         "fty_league_competitor_switch",
         "League",

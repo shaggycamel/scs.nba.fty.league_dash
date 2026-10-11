@@ -56,6 +56,17 @@ app_server <- function(input, output, session) {
     span(rv_carry_thru$league_name, " - ", rv_carry_thru$competitor_name)
   })
 
+  output$nav_last_update <- renderUI({
+    if (!exists("last_update")) {
+      return(NULL)
+    }
+    span(
+      class = "nav-last-update",
+      `data-utc` = format(last_update, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
+      "Data updated: …"
+    )
+  })
+
   #------- League Overview
   mod_league_overview_server("league_overview_1", rv_carry_thru)
 
