@@ -20,11 +20,10 @@ app_ui <- function(request) {
        .shiny-spinner-output-container > .reactable {
          flex: 1 1 auto; min-height: 0;
        }
-       .navbar .navbar-brand {
-         position: relative; line-height: 1;
+       .navbar .navbar-brand > div {
+         display: flex; align-items: baseline; gap: 0.6rem; line-height: 1;
        }
        .navbar .nav-last-update {
-         position: absolute; left: 0; top: 100%;
          font-size: 0.7rem; font-weight: 400; opacity: 0.85; line-height: 1;
          white-space: nowrap;
        }"
