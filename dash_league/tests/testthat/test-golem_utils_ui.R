@@ -93,15 +93,14 @@ test_that("Test undisplay works", {
 
   b <- shiny::actionButton("go_filter", "go")
   expect_s3_class(b, "shiny.tag")
-  expect_equal(
-    as.character(b),
-    '<button id="go_filter" type="button" class="btn btn-default action-button">go</button>'
-  )
   b_undisplay <- undisplay(b)
-  expect_s3_class(b, "shiny.tag")
+  expect_s3_class(b_undisplay, "shiny.tag")
+  # Recent shiny wraps an actionButton label in <span class="action-label">, so
+  # derive the expected markup from the button itself rather than hard-coding the
+  # label rendering; undisplay only prepends the style attribute.
   expect_equal(
     as.character(b_undisplay),
-    '<button id="go_filter" type="button" class="btn btn-default action-button" style="display: none;">go</button>'
+    sub(">", ' style="display: none;">', as.character(b), fixed = TRUE)
   )
 
   c <- shiny::tags$p(src = "plop", style = "some_style", "pouet")
