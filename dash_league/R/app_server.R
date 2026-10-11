@@ -53,18 +53,14 @@ app_server <- function(input, output, session) {
   # Update dashboard title with selected league and player
   output$navbar_title <- renderUI({
     req(rv_carry_thru$fty_parameters_met)
-    span(rv_carry_thru$league_name, " - ", rv_carry_thru$competitor_name)
-  })
-
-  output$nav_last_update <- renderUI({
-    if (!exists("last_update")) {
-      return(NULL)
+    stamp <- if (exists("last_update")) {
+      span(
+        class = "nav-last-update",
+        `data-utc` = format(last_update, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
+        "Data updated: …"
+      )
     }
-    span(
-      class = "nav-last-update",
-      `data-utc` = format(last_update, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-      "Data updated: …"
-    )
+    span(rv_carry_thru$league_name, " - ", rv_carry_thru$competitor_name, stamp)
   })
 
   #------- League Overview

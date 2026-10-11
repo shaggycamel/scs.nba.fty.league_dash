@@ -20,21 +20,15 @@ app_ui <- function(request) {
        .shiny-spinner-output-container > .reactable {
          flex: 1 1 auto; min-height: 0;
        }
-       .navbar .navbar-brand > div {
-         display: flex; align-items: baseline; gap: 0.6rem; line-height: 1;
-       }
        .navbar .nav-last-update {
-         font-size: 0.7rem; font-weight: 400; opacity: 0.85; line-height: 1;
-         white-space: nowrap;
+         font-size: 0.7rem; font-weight: 400; opacity: 0.85;
+         margin-left: 2rem; white-space: nowrap;
        }"
     ))),
     page_navbar(
       id = "title_container",
       window_title = "NBA Fantasy",
-      title = tags$div(
-        uiOutput("navbar_title"),
-        uiOutput("nav_last_update")
-      ),
+      title = uiOutput("navbar_title"),
       nav_spacer(),
       nav_panel("Overview", mod_league_overview_ui("league_overview_1")),
       nav_panel("H2H", mod_h2h_ui("h2h_1")),
