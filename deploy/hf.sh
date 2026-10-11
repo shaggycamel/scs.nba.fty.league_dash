@@ -53,7 +53,8 @@ hf_image_ref() {
     -H "Accept: application/vnd.oci.image.manifest.v1+json" \
     -H "Accept: application/vnd.oci.image.index.v1+json" \
     "https://registry-1.docker.io/v2/${path}/manifests/${tag}" \
-    | sed -n 's/^[Dd]ocker-[Cc]ontent-[Dd]igest:[[:space:]]*\(.*\)\r*$/\1/p')"
+    | tr -d '\r' \
+    | sed -n 's/^[Dd]ocker-[Cc]ontent-[Dd]igest:[[:space:]]*\(.*\)$/\1/p')"
 
   if [ -n "$digest" ]; then
     printf '%s@%s' "${repo}" "${digest}"
@@ -125,9 +126,10 @@ adapter_provision() {
   echo "[hf] configured ${repo} (FROM ${image})"
 }
 
-# Deploy: commit a cache-busted Dockerfile (so HF rebuilds and re-pulls the image
-# just pushed) and restart. This runs for every Space on every deploy, so each
-# cron.sh run rebuilds the Space rather than silently serving the previous build.
+# Deploy: commit a Dockerfile pinned to the just-pushed image digest (which makes
+# HF rebuild and re-pull exactly what was pushed), then nudge a restart. Runs for
+# every Space on every deploy, so each cron.sh run rebuilds the Space rather than
+# silently serving the previous build.
 adapter_deploy() {
   local slug="$1"
   local image="$2"
@@ -139,10 +141,17 @@ adapter_deploy() {
   fi
 
   : "${HUGGINGFACE_TOKEN:?HUGGINGFACE_TOKEN is required for HF deploys}"
+
+  # The commit is what guarantees a fresh image; it must succeed.
   hf_configure_space "$(hf_space_id "$slug")" "$image" "$app" || return 1
-  curl -sf -X POST \
+
+  # The factory restart is a best-effort nudge on top of the rebuild the commit
+  # already queued, and can race that build, so a failure here is not fatal.
+  if ! curl -sf -X POST \
     "https://huggingface.co/api/spaces/$(hf_space_id "$slug")/restart?factory=true" \
-    -H "Authorization: Bearer ${HUGGINGFACE_TOKEN}"
+    -H "Authorization: Bearer ${HUGGINGFACE_TOKEN}" >/dev/null; then
+    echo "[hf] WARN: restart for $(hf_space_id "$slug") errored; the committed Dockerfile still triggers a rebuild" >&2
+  fi
 }
 
 adapter_teardown() {
