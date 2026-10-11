@@ -210,7 +210,7 @@ mod_league_overview_server <- function(id, rv_carry_thru) {
                     }
                   }
                 ),
-                rank = colDef(name = "Rank", width = 70)
+                rank = colDef(name = "Rank", width = 80)
               ),
               pagination = FALSE,
               bordered = TRUE,

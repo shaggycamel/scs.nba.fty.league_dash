@@ -19,6 +19,10 @@ app_ui <- function(request) {
        .shiny-spinner-output-container > .r2d3,
        .shiny-spinner-output-container > .reactable {
          flex: 1 1 auto; min-height: 0;
+       }
+       .navbar .nav-last-update {
+         font-size: 0.7rem; font-weight: 400; opacity: 0.85;
+         margin-left: 2rem; white-space: nowrap;
        }"
     ))),
     page_navbar(

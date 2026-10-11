@@ -6,6 +6,8 @@
 source(here::here("data-raw", "_setup.R"))
 source(here::here("R", "utils_database.R"))
 source(here::here("R", "utils_calc_z_pcts.R"))
+db_con <- db_connect(Sys.getenv("NBA_DB_SECTION", "cockroach-read"))
+
 source(here::here("data-raw", "01_constants.R"))
 
 if (!exists("dfs_rolling_stats", inherits = FALSE)) {
@@ -19,7 +21,6 @@ if (!exists("dfs_rolling_stats", inherits = FALSE)) {
 # Shared runtime objects ship with every league container's app data.
 usethis::use_data(ls_nba_teams, ls_injuries, ls_player_game_log, overwrite = TRUE)
 
-db_con <- db_connect(Sys.getenv("NBA_DB_SECTION", "cockroach-read"))
 source(here::here("data-raw", "03_fty_base.R"))
 source(here::here("data-raw", "data_h2h.R"))
 source(here::here("data-raw", "data_league_overview.R"))
