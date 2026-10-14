@@ -70,11 +70,20 @@ try {
   await page.fill("#password", PASSWORD);
   await page.click("#login");
 
-  await page.waitForSelector("#login_message:not(:empty)", { timeout: 60000 })
-    .then(async () => {
-      throw new Error("login failed: " + (await page.textContent("#login_message")));
-    })
-    .catch(() => {});
+  await page.waitForFunction(
+    () => {
+      const message = document.querySelector("#login_message")?.textContent.trim();
+      return Boolean(
+        message ||
+          document.querySelector("select#league_choice") ||
+          document.querySelector("iframe#league_frame"),
+      );
+    },
+    null,
+    { timeout: 60000 },
+  );
+  const loginMessage = await page.textContent("#login_message").catch(() => "");
+  if (loginMessage?.trim()) throw new Error("login failed: " + loginMessage.trim());
 
   // The chooser opens automatically for a multi-league customer.
   await page.waitForSelector("select#league_choice", { state: "attached", timeout: 60000 });
