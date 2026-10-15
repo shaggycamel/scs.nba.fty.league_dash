@@ -7,7 +7,7 @@ df_nba_player_box_score <-
   as_tibble() |>
   mutate(
     across(ends_with("_id"), \(x) as.integer(x)),
-    across(all_of(cats), \(x) as.double(x)),
+    across(all_of(player_stat_cols), \(x) as.double(x)),
     season = ordered(season),
     season_type = ordered(season_type, c("Pre Season", "Regular Season", "Playoffs")),
     year_season_type = fct_cross(season_type, str_sub(season, start = 6), sep = " ")
@@ -92,18 +92,18 @@ df_nba_roster <- tbl(db_con, I("nba.team_roster_vw")) |>
 dfs_rolling_stats <- df_nba_player_box_score |>
   arrange(game_date) |>
   filter(game_date < cur_date, !is.na(player_id)) |>
-  mutate(across(all_of(cats), \(x) coalesce(x, 0))) |>
+  mutate(across(all_of(player_stat_cols), \(x) coalesce(x, 0))) |>
   select(-year_season_type) |>
   (\(df_t) {
     map(set_names(c(7, 15, 30)), \(window) {
       df_t |>
         mutate(
-          across(any_of(cats), \(x) {
+          across(any_of(player_stat_cols), \(x) {
             slider::slide_period_dbl(x, game_date, "day", ~ median(.x, na.rm = TRUE), .before = window, .after = -1)
           }),
           .by = player_id
         ) |>
-        mutate(across(any_of(cats), \(x) coalesce(x, 0)))
+        mutate(across(any_of(player_stat_cols), \(x) coalesce(x, 0)))
     })
   })() |>
   map(\(df_t) {
@@ -201,7 +201,7 @@ ls_injuries <-
 ls_player_game_log <-
   df_nba_player_box_score |>
   filter(between(game_date, max(game_date) - ddays(30), max(game_date) - ddays(1))) |>
-  select(player_id, game_date, opponent, any_of(cats)) |>
+  select(player_id, game_date, opponent, any_of(player_stat_cols)) |>
   arrange(desc(game_date)) |>
   nest_by(player_id) |>
   deframe()
