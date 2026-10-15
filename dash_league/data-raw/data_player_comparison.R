@@ -6,26 +6,35 @@ dfs_player_comparison <- map(set_names(as.character(unique(df_fty_base$league_id
       filter(season == cur_season) |>
       slice_max(game_date, by = player_id)
 
-    df_inr |>
-      mutate(
-        across(min:blk, \(x) round(scales::rescale(x), 2)),
-        across(pf:td3, \(x) round(scales::rescale(x), 2)),
-        # Invert the categories where a low value is the good outcome (eg turnovers)
-        across(
-          any_of(lower_is_better_cats),
-          \(x) round((((x * -1) - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE))) + 1, 2)
-        ),
+    # Shooting z-scores come from the raw counts: rescaling fgm/fga/ftm/fta first
+    # would change the percentages and attempt weights they are built from.
+    df_compare <- df_inr |> calc_z_pcts()
+
+    comparison_meta <- df_fty_cats |>
+      filter(
+        league_id == lg,
+        (category_role == "scored" & !is_ratio) |
+          (category_role == "derived" & str_like(nba_category, "%_z")),
+        nba_category %in% colnames(df_compare)
       ) |>
-      calc_z_pcts() |>
-      mutate(across(ends_with("_z"), \(x) round(scales::rescale(x), 2))) |>
+      distinct(nba_category, higher_is_better)
+
+    higher_cols <- comparison_meta |>
+      filter(higher_is_better) |>
+      pull(nba_category)
+
+    lower_cols <- comparison_meta |>
+      filter(!higher_is_better) |>
+      pull(nba_category)
+
+    df_compare |>
+      mutate(
+        across(all_of(higher_cols), \(x) round(scales::rescale(x), 2)),
+        # Invert the categories where a low value is the good outcome (eg turnovers)
+        across(all_of(lower_cols), \(x) round(scales::rescale(-x), 2))
+      ) |>
       pivot_longer(
-        cols = df_fty_cats |>
-          filter(
-            league_id == lg,
-            (category_role == "scored" & !is_ratio) |
-              (category_role == "derived" & str_like(nba_category, "%_z"))
-          ) |>
-          pull(nba_category),
+        cols = all_of(comparison_meta$nba_category),
         names_to = "stat"
       ) |>
       (\(x) {

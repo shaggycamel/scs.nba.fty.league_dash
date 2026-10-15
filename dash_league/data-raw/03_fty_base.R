@@ -92,12 +92,14 @@ dfs_fty_roster <-
 
 df_fty_box_score <-
   tbl(db_con, I("fty.matchup_box_score_vw")) |>
-  filter(season == cur_season) |>
-  # filter(matchup <= 11) |> # for testing purposes
-  select(-season, -platform, -matches("r_name|r_abbrev")) |>
-  relocate(starts_with("competitor"), .before = matchup) |>
+  filter(season == cur_season, league_id %in% target_leagues) |>
+  select(league_id, competitor_id, matchup, category, value) |>
   as_tibble() |>
-  filter(league_id %in% target_leagues) |>
+  pivot_wider(
+    id_cols = c(league_id, competitor_id, matchup),
+    names_from = category,
+    values_from = value
+  ) |>
   group_by(league_id, matchup) |>
   calc_z_pcts() |>
   ungroup() |>
