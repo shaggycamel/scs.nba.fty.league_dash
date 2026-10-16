@@ -210,6 +210,13 @@ mod_league_overview_server <- function(id, rv_carry_thru) {
                     }
                   }
                 ),
+                fantasy_points = colDef(
+                  name = "Fantasy Points",
+                  show = any(!is.na(df_cat$fantasy_points)),
+                  cell = \(value) {
+                    if (is.na(value)) "" else format(round(value, 1), nsmall = 0, big.mark = ",")
+                  }
+                ),
                 rank = colDef(name = "Rank", width = 80)
               ),
               pagination = FALSE,
