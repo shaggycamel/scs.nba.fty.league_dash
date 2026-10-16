@@ -90,11 +90,18 @@ dfs_fty_roster <-
 
 # Fantasy Box Scores -----------------------------------------------------
 
-df_fty_box_score <-
+# Long form keeps the weighted per-category points; the wide form below keeps
+# the raw values the category views are built on.
+df_fty_box_score_long <-
   tbl(db_con, I("fty.matchup_box_score_vw")) |>
   filter(season == cur_season, league_id %in% target_leagues) |>
-  select(league_id, competitor_id, matchup, category, value) |>
+  select(league_id, competitor_id, matchup, category, value, fantasy_points) |>
   as_tibble() |>
+  mutate(across(c(ends_with("_id"), matchup), \(x) as.integer(x)))
+
+df_fty_box_score <-
+  df_fty_box_score_long |>
+  select(-fantasy_points) |>
   pivot_wider(
     id_cols = c(league_id, competitor_id, matchup),
     names_from = category,
@@ -102,8 +109,7 @@ df_fty_box_score <-
   ) |>
   group_by(league_id, matchup) |>
   calc_z_pcts() |>
-  ungroup() |>
-  mutate(across(c(ends_with("_id"), matchup), \(x) as.integer(x)))
+  ungroup()
 
 
 # Free Agents ------------------------------------------------------------
@@ -152,6 +158,15 @@ ls_lo_lg_cats <-
   })
 
 
+# Category weights -------------------------------------------------------
+
+df_fty_cat_weights <-
+  df_fty_cats |>
+  filter(category_role == "scored") |>
+  select(league_id, nba_category, fmt_category, display_order, higher_is_better, points, scoring_type) |>
+  arrange(league_id, display_order, nba_category)
+
+
 # Conversion list --------------------------------------------------------
 
 ls_fty_lookup <- list(
@@ -174,6 +189,7 @@ usethis::use_data(
   dfs_fty_roster,
   dfs_fty_recent_activity,
   ls_lo_lg_cats,
+  df_fty_cat_weights,
   ls_fty_lookup,
   overwrite = TRUE
 )

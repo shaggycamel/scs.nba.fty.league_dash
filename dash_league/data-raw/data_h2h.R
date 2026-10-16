@@ -119,21 +119,7 @@ dfs_h2h_future_generation <- function() {
           team,
           opponent,
           home,
-          min,
-          pts,
-          fg3_m,
-          fgm,
-          fga,
-          ftm,
-          fta,
-          ast,
-          reb,
-          stl,
-          blk,
-          tov,
-          pf,
-          dd2,
-          td3
+          any_of(player_stat_cols)
         ),
       by = join_by(player_id, player_team == team, matchup_start <= game_date, matchup_end >= game_date),
       relationship = "many-to-many"

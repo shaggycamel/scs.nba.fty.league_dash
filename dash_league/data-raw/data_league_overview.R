@@ -242,6 +242,16 @@ completed_matchups <-
   distinct(league_id, matchup_period) |>
   rename(matchup = matchup_period)
 
+# Weighted category points a league actually scored (value * its weight). NA for
+# leagues that score by category: their leagues_categories rows carry no points.
+df_fty_box_score_points <-
+  df_fty_box_score_long |>
+  inner_join(completed_matchups, by = join_by(league_id, matchup)) |>
+  summarise(
+    fantasy_points = if (all(is.na(fantasy_points))) NA_real_ else sum(fantasy_points, na.rm = TRUE),
+    .by = c(league_id, competitor_id, category)
+  )
+
 dfs_fty_standings_cats <-
   map(set_names(target_leagues), \(l_id) {
     df_bs <- df_fty_box_score |>
@@ -266,6 +276,11 @@ dfs_fty_standings_cats <-
           }
 
           value |>
+            left_join(
+              filter(df_fty_box_score_points, league_id == l_id, category == cat) |>
+                select(competitor_id, fantasy_points),
+              by = join_by(competitor_id)
+            ) |>
             mutate(
               league_id = l_id,
               category = cat,
@@ -283,7 +298,7 @@ dfs_fty_standings_cats <-
     rank = if_else(higher_is_better, rank(-value), rank(value)),
     .by = c(league_id, category)
   ) |>
-  select(competitor_id, category, fmt_category, display_order, is_ratio, value, rank, league_id) |>
+  select(competitor_id, category, fmt_category, display_order, is_ratio, value, fantasy_points, rank, league_id) |>
   arrange(league_id, competitor_id, display_order) |>
   group_by(league_id) |>
   nest() |>

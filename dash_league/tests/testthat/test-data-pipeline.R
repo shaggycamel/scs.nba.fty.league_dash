@@ -1,8 +1,9 @@
 # The data pipeline (data-raw/_generate_all.R) reads nba/fty views that resolve
 # player ids to names through the util player-matching layer
-# (util.player_id_map_vw). These tests assert that contract against the
-# database. They need a live postgres instance and skip when one isn't
-# reachable, mirroring test-utils_database.R.
+# (util.player_id_map_vw) and weights a points league's categories into its
+# official score. These tests assert those contracts against the database. They
+# need a live postgres instance and skip when one isn't reachable, mirroring
+# test-utils_database.R.
 
 pipeline_db <- function() {
   tryCatch(db_connect("postgres"), error = function(e) NULL)
@@ -83,4 +84,36 @@ test_that("recent injury rows with an nba_id resolve through util.player_id_map_
        AND nm.player_key IS NULL")$n
 
   expect_equal(bad, 0L)
+})
+
+test_that("a points league's weighted categories reproduce ESPN's official matchup score", {
+  con <- pipeline_db()
+  skip_if(is.null(con), "no local NBA database available")
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+
+  weighted <- DBI::dbGetQuery(con, "
+    SELECT count(*)::int AS n
+      FROM fty.matchup_box_score_vw
+     WHERE scoring_type = 'H2H_POINTS' AND fantasy_points IS NOT NULL")$n
+  skip_if(weighted == 0L, "no points-league matchup box scores available")
+
+  mismatches <- DBI::dbGetQuery(con, "
+    WITH weighted AS (
+      SELECT season, platform, league_id, matchup, competitor_id,
+             sum(fantasy_points) AS fantasy_points
+        FROM fty.matchup_box_score_vw
+       WHERE scoring_type = 'H2H_POINTS'
+       GROUP BY 1, 2, 3, 4, 5
+    )
+    SELECT count(*)::int AS n
+      FROM weighted w
+      JOIN fty.matchup_result mr
+        ON mr.season = w.season
+       AND mr.platform = w.platform
+       AND mr.league_id = w.league_id
+       AND mr.matchup = w.matchup
+       AND mr.competitor_id = w.competitor_id
+     WHERE abs(w.fantasy_points - mr.score) > 0.001")$n
+
+  expect_equal(mismatches, 0L)
 })
