@@ -32,7 +32,6 @@ test_that("entry app boots, logs in and builds a signed iframe", {
       NBA_ENTRY_DEV = "1",
       NBA_ENTRY_DEV_PASSWORD = "dev",
       NBA_HANDOFF_SECRET = "test-secret",
-      NBA_SEASON = "2025-26",
       NBA_ENTRY_CREDENTIALS = ""
     ),
     {

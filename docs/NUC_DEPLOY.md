@@ -35,8 +35,10 @@ Read this whole file before running anything. Prefer `DRY_RUN=1` first.
   automatically when run non-interactively; for a manual run, source it first):
   - `DOCKERHUB_TOKEN` — Docker Hub push token (required).
   - `HUGGINGFACE_TOKEN` — HF token with **write** access to the Spaces (required).
-  - `DOCKERHUB_USER` (default `shaggycamel`), `NBA_HF_OWNER` (default `shaggycamel`),
-    `NBA_SEASON` (optional; the default lives in `core::nba_season()`).
+  - `DOCKERHUB_USER` (default `shaggycamel`) and `NBA_HF_OWNER` (default `shaggycamel`).
+
+  The current season is defined only in `core::nba_season()`; do not configure
+  `NBA_SEASON` in `.profile` or Hugging Face Space variables.
 
   Create it once (git-ignored, never commit):
   ```bash
@@ -182,9 +184,6 @@ do
     -H "Authorization: Bearer $HF" -H "Content-Type: application/json" \
     -d '{"key":"NBA_DB_SECTION","value":"cockroach-read"}'
 
-  curl -sf -X POST "https://huggingface.co/api/spaces/$REPO/variables" \
-    -H "Authorization: Bearer $HF" -H "Content-Type: application/json" \
-    -d '{"key":"NBA_SEASON","value":"2025-26"}'
 done
 ```
 
@@ -234,9 +233,9 @@ dashboard should load inside the iframe, already scoped to that customer's manag
 - **Base build fails / `core` missing**: check `renv.lock` includes
   `openssl`, `digest`, `ini`, `bslib`, `DBI`, `RPostgres`. Rebuild with
   `REBUILD_BASE=1`.
-- **"no leagues found"**: `fty.league` has no rows for `NBA_SEASON`, or the
+- **"no leagues found"**: `fty.league` has no rows for `core::nba_season()`, or the
   credentials INI section is wrong. Debug inside the base image:
-  `docker run --rm -e NBA_SEASON=2025-26 -v "$HOME/.config:/root/.config:ro" -v "$PWD:/work" -w /work/dash_league scs.nba.fty.league_dash_base:latest Rscript ./data-raw/_list_leagues.R`
+  `docker run --rm -v "$HOME/.config:/root/.config:ro" -v "$PWD:/work" -w /work/dash_league scs.nba.fty.league_dash_base:latest Rscript ./data-raw/_list_leagues.R`
 - **HF restart returns non-2xx**: the Space does not exist (run with `PROVISION=1`)
   or `HUGGINGFACE_TOKEN` lacks write access.
 - **401/blank league dashboard**: `NBA_HANDOFF_SECRET` differs between entry and the

@@ -67,8 +67,9 @@ Full runbook: `docs/NUC_DEPLOY.md` (load on demand — do not preload).
 
 - Never commit secrets. DB creds live in `~/.config/scs_hub_credentials.ini`;
   tokens in `./.profile` (git-ignored); e2e creds in `~/.config/scs_e2e.env`.
-- Runtime config via env: `NBA_DB_SECTION`, `NBA_SEASON`, `NBA_HANDOFF_SECRET`,
-  `NBA_REQUIRE_HANDOFF`.
+- Runtime config via env: `NBA_DB_SECTION`, `NBA_HANDOFF_SECRET`,
+  `NBA_REQUIRE_HANDOFF`. The current season is defined only by
+  `core::nba_season()`.
 - Handoff security: `entry` signs an HMAC token; league containers verify it.
   `NBA_HANDOFF_SECRET` must be identical on the entry and every league Space.
 - `scripts/` is git-ignored. It holds `set_customer_password.R` (sets

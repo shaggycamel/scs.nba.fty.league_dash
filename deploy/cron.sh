@@ -90,9 +90,6 @@ DOCKERHUB_USER="${DOCKERHUB_USER:-shaggycamel}"
 IMAGE_NAME="scs.nba.fty.league_dash"
 BASE_IMAGE="scs.nba.fty.league_dash_base:latest"
 TAG="${TAG:-latest}"
-# Season: pass NBA_SEASON through if set; otherwise leave it unset so the R
-# default in core::nba_season() applies (one source of truth for the default).
-SEASON="${NBA_SEASON:-}"
 EXCLUDE_LEAGUES="${EXCLUDE_LEAGUES:-}"
 DRY_RUN="${DRY_RUN:-0}"
 REBUILD_BASE="${REBUILD_BASE:-0}"
@@ -159,7 +156,6 @@ run_r() {
     -e UPDATE_LOG_SOURCE="$UPDATE_LOG_SOURCE" \
     -e UPDATE_LOG_KICKOFF="${UPDATE_LOG_KICKOFF:-}" \
     -e DEPLOY_CADENCE="$DEPLOY_CADENCE" \
-    -e NBA_SEASON="$SEASON" \
     -e LEAGUE_ID="${LEAGUE_ID:-}" \
     -v "${REPO_DIR}:/work" \
     -v "${CREDS_FILE}:/root/.config/scs_hub_credentials.ini:ro" \

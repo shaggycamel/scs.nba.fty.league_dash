@@ -16,9 +16,10 @@ docker run -p 3838:3838 shaggycamel/scs.nba.fty.league_dash:latest
 docker build -f docker/Dockerfile_entry --progress=plain -t shaggycamel/scs.nba.fty.league_dash_entry:latest .
 docker run -p 3839:3838 shaggycamel/scs.nba.fty.league_dash_entry:latest
 # then go to 127.0.0.1:3839
-# Entry runtime config: NBA_DB_SECTION, NBA_HANDOFF_SECRET, NBA_SEASON,
-# NBA_HF_OWNER. Passwords live in fty.customer.password_hash (set one with
-# scripts/set_customer_password.R). For local dev only: NBA_ENTRY_DEV=1 with
+# Entry runtime config: NBA_DB_SECTION, NBA_HANDOFF_SECRET, NBA_HF_OWNER.
+# The season is defined in core::nba_season(). Password hashes live in
+# fty.customer.password_hash (see scripts/set_customer_password.R).
+# For local dev only: NBA_ENTRY_DEV=1 with
 # NBA_ENTRY_DEV_PASSWORD.
 
 # ── Nuc notes ────────────────────────────────────────────────────────────────
