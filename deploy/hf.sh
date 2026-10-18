@@ -84,26 +84,32 @@ hf_runtime() {
     | python3 -c 'import sys,json; d=json.load(sys.stdin); r=d.get("runtime") or {}; print(r.get("sha",""), r.get("stage",""))'
 }
 
-# Wait until the Space is actually serving the expected commit. HF sometimes
-# leaves a Space RUNNING on its previous build (it did not rebuild), which
-# serves a stale image; this detects that and forces a factory reboot, then
-# keeps waiting. Returns non-zero if it never converges.
+# Wait until the Space is serving the expected commit and its HTTP endpoint
+# responds. HF sometimes leaves a Space RUNNING on its previous build (it did
+# not rebuild), which serves a stale image; this detects that and forces a
+# factory reboot, then keeps waiting. Returns non-zero if it never converges.
 hf_wait_healthy() {
   local repo="$1" expected="$2" timeout="${3:-900}" grace="${HF_HEAL_GRACE:-90}"
-  local waited=0 healed=0 runtime sha stage
+  local waited=0 healed=0 runtime sha stage url last_sha="" last_stage="" http_timeout="${HF_HTTP_TIMEOUT:-10}"
+  url="$(adapter_url "${repo##*/}")"
 
   while [ "$waited" -lt "$timeout" ]; do
     runtime="$(hf_runtime "$repo" 2>/dev/null || true)"
     sha="${runtime%% *}"
     stage="${runtime##* }"
+    last_sha="$sha"
+    last_stage="$stage"
 
     if [ -n "$expected" ] && [ "$sha" = "$expected" ] && [ "$stage" = "RUNNING" ]; then
-      return 0
+      if curl -fsSL --max-time "$http_timeout" -o /dev/null "${url}/" 2>/dev/null; then
+        return 0
+      fi
     fi
 
     # Only heal a Space that is up but stuck on its previous commit. While it is
     # BUILDING, leave it alone so we do not interrupt an in-flight rebuild.
-    if [ "$stage" = "RUNNING" ] && [ "$waited" -ge "$grace" ] && [ "$healed" = "0" ]; then
+    if [ -n "$expected" ] && [ "$stage" = "RUNNING" ] && [ "$sha" != "$expected" ] \
+      && [ "$waited" -ge "$grace" ] && [ "$healed" = "0" ]; then
       echo "[hf] WARN: ${repo} still on ${sha:-?} (${stage:-?}), expected ${expected:-?}; forcing factory reboot" >&2
       curl -sf -X POST "https://huggingface.co/api/spaces/${repo}/restart?factory=true" \
         -H "Authorization: Bearer ${HUGGINGFACE_TOKEN}" >/dev/null 2>&1 || true
@@ -114,7 +120,11 @@ hf_wait_healthy() {
     waited=$((waited + 10))
   done
 
-  echo "[hf] ERROR: ${repo} did not converge to ${expected:-?} within ${timeout}s" >&2
+  if [ "$last_sha" = "$expected" ] && [ "$last_stage" = "RUNNING" ]; then
+    echo "[hf] ERROR: ${repo} is running ${expected}, but ${url}/ did not respond within ${timeout}s" >&2
+  else
+    echo "[hf] ERROR: ${repo} did not converge to ${expected:-?} (last runtime ${last_sha:-?} ${last_stage:-?}) within ${timeout}s" >&2
+  fi
   return 1
 }
 
@@ -135,7 +145,7 @@ hf_configure_space() {
   local stamp
   stamp="$(date -u +%Y%m%dT%H%M%SZ)-${RANDOM}${RANDOM}"
 
-  local df_json="FROM ${image_ref}\\nARG SPACE_REBUILD=${stamp}\\nRUN echo \\\"space rebuild ${stamp}\\\"\\nEXPOSE 7860\\nUSER rstudio\\nCMD [\\\"R\\\", \\\"-e\\\", \\\"options('shiny.port'=7860, 'shiny.host'='0.0.0.0'); library(${app}); ${app}::run_app()\\\"]"
+  local df_json="FROM ${image_ref}\\nARG SPACE_REBUILD=${stamp}\\nRUN echo \\\"space rebuild ${stamp}\\\"\\nHEALTHCHECK --interval=30s --timeout=5s --start-period=60s CMD curl -fsS http://localhost:7860/ >/dev/null || exit 1\\nEXPOSE 7860\\nUSER rstudio\\nCMD [\\\"R\\\", \\\"-e\\\", \\\"options('shiny.port'=7860, 'shiny.host'='0.0.0.0'); library(${app}); ${app}::run_app()\\\"]"
 
   printf '%s\n' \
     '{"key":"header","value":{"summary":"provision space"}}' \
