@@ -39,10 +39,17 @@ update_log_row <- function(
   if (is.null(cadence) || length(cadence) != 1L || is.na(cadence) || !nzchar(cadence)) {
     cadence <- "all"
   }
-  error_message <- if (is.null(error) || length(error) == 0L || is.na(error[[1L]])) {
+  error_chr <- if (is.null(error) || length(error) == 0L) {
     NA_character_
   } else {
     as.character(error[[1L]])
+  }
+  error_message <- if (
+    length(error_chr) == 1L && !is.na(error_chr) && nzchar(error_chr)
+  ) {
+    error_chr
+  } else {
+    NA_character_
   }
   source <- if (is.null(source) || length(source) == 0L || is.na(source[[1L]])) {
     NA_character_

@@ -36,6 +36,11 @@ test_that("a failure carries its short stage and reason", {
   expect_equal(row$error_message, "docker build: boom")
 })
 
+test_that("a blank error is treated as no error", {
+  expect_true(is.na(core:::update_log_row("dashboard:x", TRUE, error = "")$error_message))
+  expect_true(is.na(core:::update_log_row("dashboard:x", TRUE, error = NA_character_)$error_message))
+})
+
 test_that("a blank cadence falls back to 'all'", {
   expect_equal(core:::update_log_row("dashboard:x", TRUE, cadence = "")$cadence, "all")
   expect_equal(core:::update_log_row("dashboard:x", TRUE, cadence = NULL)$cadence, "all")
