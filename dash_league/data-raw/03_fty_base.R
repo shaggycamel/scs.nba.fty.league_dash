@@ -107,7 +107,11 @@ df_fty_box_score <-
     values_from = value
   ) |>
   (\(df) {
-    missing <- setdiff(player_stat_cols, names(df))
+    required_cols <- unique(c(
+      player_stat_cols,
+      df_fty_cats$nba_category[df_fty_cats$category_role %in% c("scored", "component")]
+    ))
+    missing <- setdiff(required_cols, names(df))
     if (length(missing) > 0) {
       df <- mutate(df, !!!purrr::set_names(rep(list(0), length(missing)), missing))
     }
