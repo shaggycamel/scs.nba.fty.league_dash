@@ -73,6 +73,10 @@ Full runbook: `docs/NUC_DEPLOY.md` (load on demand — do not preload).
   tokens in `./.profile` (git-ignored); the handoff key in
   `~/.config/scs_hf_league_deploy.ini` (mode 600); e2e creds in
   `~/.config/scs_e2e.env`.
+- Customer logins live in `fty.customer` (`email`, `password_hash`). E2E can
+  iterate customers from `e2e/export_customers.R`; the shared test password comes
+  from `~/.config/scs_e2e.env` or a git-ignored accounts file, never committed.
+  Hashes are one-way; verify candidates with `core::verify_password`.
 - `NBA_DB_SECTION` selects the build-time/local database. Space runtime uses
   `NBA_HANDOFF_SECRET` and `NBA_REQUIRE_HANDOFF`. The current season is defined
   only by `core::nba_season()`; do not set `NBA_SEASON` on Spaces.

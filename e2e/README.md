@@ -27,27 +27,45 @@ cd e2e
 npm install                       # playwright (set PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
                                   # if you'll use the installed Chrome channel)
 
-set -a; source ~/.config/scs_e2e.env; set +a   # E2E_EMAIL / E2E_PASSWORD live here, not in the repo
-E2E_EXPECT_COMPETITORS='{"ESPN:123456":"7"}' \
-  npm test
+set -a; source ~/.config/scs_e2e.env; set +a   # E2E_PASSWORD lives here, not in the repo
+
+# Single account
+E2E_EMAIL=customer@example.com E2E_EXPECT_COMPETITORS='{"ESPN:123456":"7"}' npm test
+
+# All customers with current-season league links
+E2E_EMAILS="$(Rscript export_customers.R)" npm test
 ```
 
+`export_customers.R` queries `fty.customer` joined to `fty.customer_league` and
+`fty.league` for `core::nba_season()`. It emits only customer emails whose password
+hash and competitor mapping are present. The harness uses the shared
+`E2E_PASSWORD` for every account and handles both single-league (auto-embedded)
+and multi-league (chooser) customers.
+
 Credentials are kept in `~/.config/scs_e2e.env` (git-ignored, outside the repo);
-the harness sources that file and never prints the values.
+the harness sources that file and never prints emails, passwords, or hashes.
 
 - Uses the installed **Google Chrome** (`channel: "chrome"`), so no Playwright
   browser download is required.
-- `E2E_EXPECT_COMPETITORS` is optional; when set, each selected league's iframe
-  `competitor_id` is checked against the expectation.
+- `E2E_EMAILS` accepts comma/newline-separated emails; `E2E_EMAIL` is the
+  single-account fallback.
+- `E2E_EXPECT_COMPETITORS` is optional and applies only in single-account mode.
+  With multiple accounts, the dashboard title is verified but the per-league
+  competitor expectation is skipped because the same league can map to different
+  competitors for different customers.
 - Screenshots and a JSON summary (including console errors) are written under
-  `e2e/shots/`. Exit code is non-zero if any league fails.
+  `e2e/shots/`; results are identified by account index, not email. Exit code is
+  non-zero if any league fails.
 - `E2E_HEADLESS=0` runs headed.
-- Credentials must be supplied via env and must **not** be committed. The test
+- Credentials must be supplied via env and must **not** be committed. Each test
   customer's `fty.customer.password_hash` must be set (the real-password path;
   the `NBA_ENTRY_DEV` bypass is off on hosted Spaces).
 
 ## Implementation notes (gotchas)
 
+- A single-league customer has no chooser: the entry auto-loads
+  `iframe#league_frame`, and the harness reads the league from the iframe URL.
+  Multi-league customers use the selectize chooser.
 - The league chooser is a **selectize** control in the entry's modal: the native
   `select#league_choice` is `display:none`, so Playwright's `selectOption` does
   not work. Set the value via
