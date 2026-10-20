@@ -43,9 +43,15 @@ Read this whole file before running anything. Prefer `DRY_RUN=1` first.
   ```ini
   [handoff]
   NBA_HANDOFF_SECRET=<64 hex characters>
+
+  [space]
+  hardware=cpu-upgrade
+  sleep_time=900
   ```
 
-  The current season is defined only in `core::nba_season()`; do not configure
+  New Spaces use `hardware` and `sleep_time` from `[space]`; existing Spaces keep
+  their current hardware. The current season is defined only in
+  `core::nba_season()`; do not configure
   `NBA_SEASON` in `.profile` or Hugging Face Space variables.
 
   Create it once (git-ignored, never commit):
@@ -185,6 +191,10 @@ deployment. It reads the shared handoff key from
 ```ini
 [handoff]
 NBA_HANDOFF_SECRET=<64 hex characters>
+
+[space]
+hardware=cpu-upgrade
+sleep_time=900
 ```
 
 - Entry: ensures `NBA_HANDOFF_SECRET` only. The entry's `NBA_DB_HOST`,
@@ -193,7 +203,9 @@ NBA_HANDOFF_SECRET=<64 hex characters>
 - League Spaces: ensures `NBA_HANDOFF_SECRET` and `NBA_REQUIRE_HANDOFF=1`.
 - Never set `NBA_SEASON` or `NBA_DB_SECTION` on a Space; the season comes only
   from `core::nba_season()`.
-- Leagues found by `PROVISION=1` are created and configured automatically.
+- Leagues found by `PROVISION=1` are created and configured automatically, using
+  `hardware` and `sleep_time` from `[space]`; `HF_SPACE_HARDWARE` and
+  `HF_SPACE_SLEEP_TIME` override them for one run.
 
 Normal runs add a missing secret or variable only. To rotate the shared handoff
 key, update the INI and set `ROTATE_HANDOFF_SECRET=1` for the run:

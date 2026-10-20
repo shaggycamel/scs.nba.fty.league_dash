@@ -72,6 +72,22 @@ print(json.dumps({"key": key, "value": value, "description": "handoff HMAC key"}
 PY
 }
 
+hf_deploy_config() {
+  local section="$1" key="$2"
+  python3 - "$HF_DEPLOY_INI" "$section" "$key" <<'PY'
+import configparser
+import sys
+
+ini, section, key = sys.argv[1:4]
+parser = configparser.ConfigParser()
+parser.read(ini)
+if parser.has_option(section, key):
+    value = parser.get(section, key).strip()
+    if value:
+        print(value)
+PY
+}
+
 hf_space_set_secret() {
   local repo="$1"
   local json
@@ -297,6 +313,13 @@ adapter_provision() {
   local app="${3:-league}"
   local name="${slug}"
   local repo="${HF_OWNER}/${name}"
+  local hardware="${HF_SPACE_HARDWARE:-$(hf_deploy_config space hardware)}"
+  hardware="${hardware:-cpu-upgrade}"
+  local sleep_time="${HF_SPACE_SLEEP_TIME:-$(hf_deploy_config space sleep_time)}"
+  sleep_time="${sleep_time:-900}"
+  case "$sleep_time" in
+    ''|*[!0-9]*) sleep_time=900 ;;
+  esac
 
   if [ "${DRY_RUN:-0}" = "1" ]; then
     echo "[dry-run] provision HF space ${repo} (FROM ${image}, app ${app})"
@@ -311,11 +334,11 @@ adapter_provision() {
     "https://huggingface.co/api/spaces/${repo}")"
 
   if [ "$status" != "200" ]; then
-    echo "[hf] creating ${repo}"
+    echo "[hf] creating ${repo} (${hardware}, sleep ${sleep_time}s)"
     curl -sf -X POST "https://huggingface.co/api/repos/create" \
       -H "Authorization: Bearer ${HUGGINGFACE_TOKEN}" \
       -H "Content-Type: application/json" \
-      -d "{\"type\":\"space\",\"name\":\"${name}\",\"private\":false,\"sdk\":\"docker\"}" >/dev/null || return 1
+      -d "{\"type\":\"space\",\"name\":\"${name}\",\"private\":false,\"sdk\":\"docker\",\"hardware\":\"${hardware}\",\"sleepTimeSeconds\":${sleep_time}}" >/dev/null || return 1
   fi
 
   hf_apply_space_config "$repo" "$app" || return 1
