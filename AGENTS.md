@@ -70,7 +70,7 @@ Full runbook: `docs/NUC_DEPLOY.md` (load on demand — do not preload).
 ## Conventions / gotchas
 
 - Never commit secrets. DB creds live in `~/.config/scs_hub_credentials.ini`;
-  tokens in `./.profile` (git-ignored); the handoff key in
+  deploy tokens in `~/.config/scs_deploy.env` (mode 600); the handoff key in
   `~/.config/scs_hf_league_deploy.ini` (mode 600); e2e creds in
   `~/.config/scs_e2e.env`.
 - Customer logins live in `fty.customer` (`email`, `password_hash`). E2E can

@@ -10,15 +10,15 @@
 #
 # Usage: deploy/health.sh [slug ...]        (default: entry)
 
-if [ ! -t 1 ] && [ -f ./.profile ]; then
-  # shellcheck source=/dev/null
-  source ./.profile
-fi
-
 set -uo pipefail
 
 REPO_DIR="${REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)}"
 cd "$REPO_DIR" || exit 1
+
+if [ ! -t 1 ]; then
+  # shellcheck source=/dev/null
+  . "${REPO_DIR}/deploy/env.sh"
+fi
 
 : "${HUGGINGFACE_TOKEN:?HUGGINGFACE_TOKEN is required for HF health checks}"
 

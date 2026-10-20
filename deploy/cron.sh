@@ -71,19 +71,12 @@ if ! flock -w 3600 9; then
   exit 1
 fi
 
-# Deploy secrets (DOCKERHUB_TOKEN, HUGGINGFACE_TOKEN, ...). Resolved after the cd so
-# it is the repo's own file, not whatever $HOME happened to hold: the previous
-# version sourced ./.profile before cd-ing, so under cron (cwd=$HOME) it read
-# ~/.profile and ignored the repo copy entirely. A terminal means a human is
-# driving, so values they already exported win.
+# Deploy secrets (DOCKERHUB_TOKEN, HUGGINGFACE_TOKEN, ...) are loaded from
+# ~/.config/scs_deploy.env, or SCS_DEPLOY_ENV when set. A terminal means a human
+# is driving, so values they already exported win.
 if [ ! -t 1 ]; then
-  for f in ./.deploy.env ./.profile "$HOME/.config/scs_deploy.env"; do
-    if [ -f "$f" ]; then
-      # shellcheck source=/dev/null
-      . "$f"
-      break
-    fi
-  done
+  # shellcheck source=/dev/null
+  . "${REPO_DIR}/deploy/env.sh"
 fi
 
 DOCKERHUB_USER="${DOCKERHUB_USER:-shaggycamel}"

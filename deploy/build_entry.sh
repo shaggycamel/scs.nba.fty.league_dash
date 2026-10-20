@@ -8,15 +8,15 @@
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-if [ ! -t 1 ] && [ -f ./.profile ]; then
-  # shellcheck source=/dev/null
-  source ./.profile
-fi
-
 set -uo pipefail
 
 REPO_DIR="${REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)}"
 cd "$REPO_DIR" || exit 1
+
+if [ ! -t 1 ]; then
+  # shellcheck source=/dev/null
+  . "${REPO_DIR}/deploy/env.sh"
+fi
 
 DOCKERHUB_USER="${DOCKERHUB_USER:-shaggycamel}"
 ENTRY_IMAGE="${ENTRY_IMAGE:-scs.nba.fty.league_dash_entry}"

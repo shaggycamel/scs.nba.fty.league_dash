@@ -31,8 +31,9 @@ Read this whole file before running anything. Prefer `DRY_RUN=1` first.
   `NBA_DB_SECTION=cockroach-read`. (No `psql` needed — leagues are listed via R in
   the base image.) The dashboard update log also needs a `cockroach-write`
   section, unless `NBA_UPDATE_LOG_SECTION` points elsewhere.
-- A `./.profile` on the nuc exports the tokens (the scripts source it
-  automatically when run non-interactively; for a manual run, source it first):
+- A `~/.config/scs_deploy.env` on the nuc exports the tokens (mode `600`; the
+  scripts source it automatically when run non-interactively; for a manual run,
+  source it first):
   - `DOCKERHUB_TOKEN` — Docker Hub push token (required).
   - `HUGGINGFACE_TOKEN` — HF token with **write** access to the Spaces (required).
   - `DOCKERHUB_USER` (default `shaggycamel`) and `NBA_HF_OWNER` (default `shaggycamel`).
@@ -51,17 +52,19 @@ Read this whole file before running anything. Prefer `DRY_RUN=1` first.
 
   New Spaces use `hardware` and `sleep_time` from `[space]`; existing Spaces keep
   their current hardware. The current season is defined only in
-  `core::nba_season()`; do not configure
-  `NBA_SEASON` in `.profile` or Hugging Face Space variables.
+  `core::nba_season()`; do not configure `NBA_SEASON` in the deploy env or
+  Hugging Face Space variables.
 
-  Create it once (git-ignored, never commit):
+  Create it once (outside the repo, never commit):
   ```bash
-  cat > ~/shaggy_camel_sports/nba/fty/league_dash/.profile <<'EOF'
+  mkdir -p ~/.config
+  cat > ~/.config/scs_deploy.env <<'EOF'
+  export DOCKER_BUILDKIT=1
   export DOCKERHUB_USER=shaggycamel
   export DOCKERHUB_TOKEN=...
   export HUGGINGFACE_TOKEN=...
   EOF
-  chmod 600 ~/shaggy_camel_sports/nba/fty/league_dash/.profile
+  chmod 600 ~/.config/scs_deploy.env
   ```
 
 Preflight:
@@ -72,7 +75,7 @@ git pull                      # MUST be up to date; see §3
 docker info >/dev/null && echo docker-ok
 test -f ~/.config/scs_hub_credentials.ini && echo ini-ok
 test -f ~/.config/scs_hf_league_deploy.ini && echo handoff-ini-ok
-set -a; source ./.profile; set +a
+set -a; source ~/.config/scs_deploy.env; set +a
 for v in DOCKERHUB_TOKEN HUGGINGFACE_TOKEN; do
   [ -n "${!v:-}" ] && echo "$v set" || echo "$v MISSING"
 done
@@ -107,8 +110,8 @@ Docker images: `shaggycamel/scs.nba.fty.league_dash-espn-<league_id>:latest`; en
 `shaggycamel/scs.nba.fty.league_dash_entry:latest`. Base image: `scs.nba.fty.league_dash_base:latest`.
 
 `NBA_HANDOFF_SECRET` is an arbitrary shared HMAC key (no default). It lives only
-in `~/.config/scs_hf_league_deploy.ini` (mode `600`), never in the repo or
-`.profile`. The deploy adapter reads it to configure and rotate Spaces.
+in `~/.config/scs_hf_league_deploy.ini` (mode `600`), never in the repo or the
+deploy env. The deploy adapter reads it to configure and rotate Spaces.
 
 ## 5. Build + deploy
 
@@ -122,7 +125,7 @@ docker build -f ./docker/Dockerfile_base --progress=plain -t scs.nba.fty.league_
 ```
 
 ```bash
-set -a; source ./.profile; set +a
+set -a; source ~/.config/scs_deploy.env; set +a
 
 # 5.0 Dry run (no docker, no push, no deploy)
 DRY_RUN=1 PROVISION=1 bash deploy/cron.sh
@@ -220,7 +223,7 @@ key.
 Remove legacy variables once with the adapter helpers (this restarts each Space):
 
 ```bash
-set -a; source ./.profile; set +a
+set -a; source ~/.config/scs_deploy.env; set +a
 source deploy/adapter.sh
 for slug in entry espn-95537 espn-1966813226; do
   repo="$(hf_space_id "$slug")"
