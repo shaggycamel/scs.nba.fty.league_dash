@@ -69,7 +69,7 @@ dfs_player_comparison <- map(set_names(as.character(unique(df_fty_base$league_id
       relocate(team_id, .before = team) |>
       arrange(desc(min)) |>
       # to lighten the size of final object
-      select(-any_of("pf"), -ends_with("_pct"), -matches("f[g|t][m|a]"))
+      select(-any_of("pf"), -ends_with("_pct"))
   })
 })
 

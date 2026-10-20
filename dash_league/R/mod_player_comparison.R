@@ -55,6 +55,33 @@ mod_player_comparison_server <- function(id, rv_carry_thru, rv_copy_teams) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
+    comparison_columns <- reactive({
+      dfs_player_comparison |>
+        pluck(as.character(rv_carry_thru$league_id), "7", .default = tibble()) |>
+        names()
+    })
+
+    comparison_category_choices <- reactive({
+      pluck(
+        ls_lo_lg_cats,
+        as.character(rv_carry_thru$league_id),
+        "Categories",
+        .default = character()
+      ) |>
+        unname() |>
+        intersect(comparison_columns())
+    })
+
+    cats <- reactive({
+      requested <- ls_lo_lg_cats |>
+        pluck(as.character(rv_carry_thru$league_id), .default = list()) |>
+        discard_at(\(x) x == "Overall") |>
+        unlist(use.names = FALSE) |>
+        discard(\(x) str_like(x, "%_pct"))
+
+      intersect(requested, comparison_columns())
+    })
+
     # Widget operation -------------------------------------------------------
 
     # On load...
@@ -69,11 +96,7 @@ mod_player_comparison_server <- function(id, rv_carry_thru, rv_copy_teams) {
       updateSelectizeInput(
         session,
         "excels_at_filter",
-        choices = pluck(
-          ls_lo_lg_cats,
-          as.character(rv_carry_thru$league_id),
-          "Categories"
-        )
+        choices = comparison_category_choices()
       )
     }) |>
       bindEvent(rv_carry_thru$fty_parameters_met, rv_carry_thru$league_id, rv_carry_thru$competitor_id)
@@ -120,15 +143,6 @@ mod_player_comparison_server <- function(id, rv_carry_thru, rv_copy_teams) {
       bindEvent(rv_copy_teams())
 
     # Data reactivity --------------------------------------------------------
-
-    # Relevant cats
-    cats <- reactive({
-      ls_lo_lg_cats |>
-        pluck(as.character(rv_carry_thru$league_id)) |>
-        discard_at(\(x) x == "Overall") |>
-        unlist(use.names = FALSE) |>
-        discard(\(x) str_like(x, "%_pct"))
-    })
 
     df_comparison <- reactive({
       df <- dfs_player_comparison |>

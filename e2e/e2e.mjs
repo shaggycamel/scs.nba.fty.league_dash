@@ -179,6 +179,21 @@ try {
           } else {
             entry.notes.push("overview nav not found");
           }
+          const comparison = frame.getByText("Player Comparison", { exact: true }).first();
+          if (await comparison.count()) {
+            await comparison.click();
+            await page.waitForTimeout(1500);
+            const comparisonBody = await frame.locator("body").innerText().catch(() => "");
+            const comparisonErrors = await frame.locator(".shiny-error").count().catch(() => 0);
+            if (
+              comparisonErrors > 0 ||
+              /Column .*doesn't exist|Column .*does not exist|could not find function/i.test(comparisonBody)
+            ) {
+              entry.notes.push("player comparison error");
+            }
+          } else {
+            entry.notes.push("player comparison nav not found");
+          }
         }
         entry.ok = verdict.startsWith("dashboard:") && entry.notes.length === 0;
       }

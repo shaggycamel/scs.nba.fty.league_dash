@@ -38,3 +38,23 @@ test_that("player comparison has one row per player", {
 
   expect_true(all(duplicate_counts == 0L))
 })
+
+test_that("player comparison includes every scored league category", {
+  pkg <- as.environment("package:league")
+  needed <- c("dfs_player_comparison", "ls_lo_lg_cats")
+  skip_if_not(all(rlang::env_has(pkg, needed)), "package data not built")
+
+  comparisons <- pkg[["dfs_player_comparison"]]
+  cats_all <- pkg[["ls_lo_lg_cats"]]
+
+  for (lg in names(comparisons)) {
+    available <- names(comparisons[[lg]][["7"]])
+    requested <- c(
+      unname(cats_all[[lg]][["Categories"]]),
+      unname(cats_all[[lg]][["Z Scores"]])
+    ) |>
+      purrr::discard(\(x) stringr::str_like(x, "%_pct"))
+
+    expect_length(setdiff(requested, available), 0)
+  }
+})
