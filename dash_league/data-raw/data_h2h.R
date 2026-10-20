@@ -4,10 +4,11 @@ dfs_h2h_past <- dfs_fty_roster |>
   list_rbind(names_to = "league_id") |>
   filter(assigned_date < cur_date) |>
   left_join(
-    select(df_nba_schedule, team, game_date, scheduled_to_play),
+    select(df_nba_schedule, team, game_date, scheduled_to_play, game_id),
     by = join_by(player_team == team, assigned_date == game_date)
   ) |>
-  select(-c(season_type, begin_date, end_date, player_acquisition_type, player_injury_status)) |>
+  filter(!is.na(game_id)) |>
+  select(-c(game_id, season_type, begin_date, end_date, player_acquisition_type, player_injury_status)) |>
   rename(game_date = assigned_date) |>
   left_join(
     df_nba_player_box_score |>

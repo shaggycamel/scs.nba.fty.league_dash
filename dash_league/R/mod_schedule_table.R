@@ -36,7 +36,9 @@ mod_schedule_table_server <- function(id, rv_carry_thru, rv_copy_teams) {
     observe({
       req(rv_carry_thru$fty_parameters_met)
 
-      chs <- names(pluck(dfs_fty_nba_mup_weeks, as.character(rv_carry_thru$league_id)))
+      matchups <- pluck(dfs_fty_nba_mup_weeks, as.character(rv_carry_thru$league_id))
+      req(matchups)
+      chs <- names(matchups)
       periods <- matchup_period_from_label(chs)
 
       # same clamp as mod_h2h
@@ -54,7 +56,9 @@ mod_schedule_table_server <- function(id, rv_carry_thru, rv_copy_teams) {
         selected = chs[match(selected_period, periods)]
       )
 
-      mup_min_max_dts <- pluck(dfs_fty_schedule, as.character(rv_carry_thru$league_id)) |>
+      schedule <- pluck(dfs_fty_schedule, as.character(rv_carry_thru$league_id))
+      req(schedule)
+      mup_min_max_dts <- schedule |>
         distinct(matchup_period, matchup_start, matchup_end) |>
         filter(matchup_period == selected_period)
 
@@ -82,7 +86,9 @@ mod_schedule_table_server <- function(id, rv_carry_thru, rv_copy_teams) {
     observe({
       req(rv_carry_thru$fty_parameters_met)
 
-      mup_min_max_dts <- pluck(dfs_fty_schedule, as.character(rv_carry_thru$league_id)) |>
+      schedule <- pluck(dfs_fty_schedule, as.character(rv_carry_thru$league_id))
+      req(schedule)
+      mup_min_max_dts <- schedule |>
         filter(matchup_period == matchup_period_from_label(input$matchup_selection)) |>
         distinct(matchup_period, matchup_start, matchup_end)
 
@@ -108,8 +114,10 @@ mod_schedule_table_server <- function(id, rv_carry_thru, rv_copy_teams) {
     observe({
       req(rv_carry_thru$fty_parameters_met)
 
-      selected_values <- dfs_fty_nba_mup_weeks |>
-        pluck(as.character(rv_carry_thru$league_id), input$matchup_selection) |>
+      week <- dfs_fty_nba_mup_weeks |>
+        pluck(as.character(rv_carry_thru$league_id), input$matchup_selection)
+      req(week)
+      selected_values <- week |>
         select(Team) |>
         # mutate(Team = as.character(Team)) |>
         slice(getReactableState("schedule_table", "selected"))
@@ -142,7 +150,9 @@ mod_schedule_table_server <- function(id, rv_carry_thru, rv_copy_teams) {
     mup_dts <- reactive({
       req(rv_carry_thru$fty_parameters_met, input$matchup_selection != "")
 
-      pluck(dfs_fty_schedule, as.character(rv_carry_thru$league_id)) |>
+      schedule <- pluck(dfs_fty_schedule, as.character(rv_carry_thru$league_id))
+      req(schedule)
+      schedule |>
         filter(matchup_period == matchup_period_from_label(input$matchup_selection)) |>
         distinct(matchup_period, matchup_start, matchup_end)
     }) |>

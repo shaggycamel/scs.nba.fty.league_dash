@@ -27,11 +27,11 @@ mod_league_overview_ui <- function(id) {
           height = 600,
           nav_panel(
             "Standings",
-            shinycssloaders::withSpinner(reactableOutput(ns("standings_table")), type = 1, color = "#133DEF")
+            shinycssloaders::withSpinner(uiOutput(ns("standings_ui")), type = 1, color = "#133DEF")
           ),
           nav_panel(
             "Category Trend",
-            shinycssloaders::withSpinner(r2d3::d3Output(ns("fty_lo_plt"), height = "100%"), type = 1, color = "#133DEF")
+            shinycssloaders::withSpinner(uiOutput(ns("trend_ui")), type = 1, color = "#133DEF")
           )
         ),
         card(
@@ -52,6 +52,8 @@ mod_league_overview_ui <- function(id) {
 #'
 mod_league_overview_server <- function(id, rv_carry_thru) {
   moduleServer(id, function(input, output, session) {
+    season_start <- get0("cur_season_start", envir = asNamespace("league"), ifnotfound = NULL)
+
     # Update categories ------------------------------------------------------
 
     observe({
@@ -70,14 +72,27 @@ mod_league_overview_server <- function(id, rv_carry_thru) {
     df_lo_pt <- reactive(filter(df_lo(), as.integer(matchup_sigmoid) == matchup_sigmoid))
     opponent <- reactive(get_opponent(rv_carry_thru, rv_carry_thru$cur_matchup_period))
 
+    output$trend_ui <- renderUI({
+      req(rv_carry_thru$fty_parameters_met)
+      df <- df_lo()
+      if (is.null(df) || nrow(df) == 0) {
+        empty_state(season_placeholder_text(start = season_start))
+      } else {
+        r2d3::d3Output(ns("fty_lo_plt"), height = "100%")
+      }
+    })
+
     df_tbl <- reactive({
       req(rv_carry_thru$fty_parameters_met)
-
+      df <- pluck(dfs_fty_recent_activity, as.character(rv_carry_thru$league_id))
+      if (is.null(df)) {
+        return(tibble())
+      }
       if (input$fty_lg_ov_just_h2h) {
-        pluck(dfs_fty_recent_activity, as.character(rv_carry_thru$league_id)) |>
+        df |>
           filter(competitor_id %in% c(rv_carry_thru$competitor_id, opponent()$id))
       } else {
-        pluck(dfs_fty_recent_activity, as.character(rv_carry_thru$league_id))
+        df
       }
     }) |>
       bindEvent(
@@ -152,6 +167,16 @@ mod_league_overview_server <- function(id, rv_carry_thru) {
       pluck(dfs_fty_standings, as.character(rv_carry_thru$league_id))
     }) |>
       bindEvent(rv_carry_thru$fty_parameters_met, rv_carry_thru$league_id)
+
+    output$standings_ui <- renderUI({
+      req(rv_carry_thru$fty_parameters_met)
+      df <- df_standings()
+      if (is.null(df) || nrow(df) == 0) {
+        empty_state(season_placeholder_text(start = season_start))
+      } else {
+        reactableOutput(ns("standings_table"))
+      }
+    })
 
     col_fmt_standings <- list(
       rank = colDef(name = "Rank", width = 60),
@@ -278,10 +303,13 @@ mod_league_overview_server <- function(id, rv_carry_thru) {
       bindEvent(cur_tbl_sort_order())
 
     output$recent_activity_table <- renderReactable({
-      req(df_tbl())
+      df <- df_tbl()
+      if (is.null(df) || nrow(df) == 0) {
+        return(placeholder_reactable("No recent activity yet."))
+      }
 
       reactable(
-        df_tbl(),
+        df,
         pagination = FALSE,
         bordered = TRUE,
         style = list(border = "1px solid #000000"),

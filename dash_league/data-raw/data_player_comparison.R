@@ -4,7 +4,12 @@ dfs_player_comparison <- map(set_names(as.character(unique(df_fty_base$league_id
   map(set_names(names(dfs_rolling_stats)), \(rl) {
     df_inr <- dfs_rolling_stats[[rl]] |>
       filter(season == cur_season) |>
-      slice_max(game_date, by = player_id)
+      slice_max(game_date, by = player_id, with_ties = FALSE)
+
+    free_agents <- pluck(dfs_fty_free_agents, as.character(lg), .default = tibble(player_id = integer())) |>
+      select(player_id) |>
+      distinct() |>
+      mutate(free_agent = TRUE)
 
     # Shooting z-scores come from the raw counts: rescaling fgm/fga/ftm/fta first
     # would change the percentages and attempt weights they are built from.
@@ -56,12 +61,7 @@ dfs_player_comparison <- map(set_names(as.character(unique(df_fty_base$league_id
         by = join_by(player_id)
       ) |>
       calc_z_pcts() |>
-      left_join(
-        dfs_fty_free_agents[[lg]] |>
-          select(player_id) |>
-          mutate(free_agent = TRUE),
-        by = join_by(player_id)
-      ) |>
+      left_join(free_agents, by = join_by(player_id)) |>
       left_join(
         tibble(team = names(ls_nba_teams), team_id = ls_nba_teams),
         by = join_by(team)

@@ -155,8 +155,16 @@ mod_h2h_server <- function(
         arrange(player_name) |>
         deframe()
 
-      rv_alter_team_modal_vals$free_agents <- dfs_h2h_future |>
-        pluck(as.character(rv_carry_thru$league_id), "free_agent", "free_agent", "7") |>
+      free_agents <- dfs_h2h_future |>
+        pluck(
+          as.character(rv_carry_thru$league_id),
+          "free_agent",
+          "free_agent",
+          "7",
+          .default = tibble(player_name = character(), player_id = integer())
+        )
+
+      rv_alter_team_modal_vals$free_agents <- free_agents |>
         distinct(player_name, player_id) |>
         anti_join(
           df_base() |>

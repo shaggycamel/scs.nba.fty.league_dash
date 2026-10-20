@@ -7,6 +7,12 @@
 #' @noRd
 #'
 calc_z_pcts <- function(df) {
+  missing <- setdiff(c("fgm", "fga", "ftm", "fta"), names(df))
+  if (length(missing) > 0) {
+    df <- df |>
+      mutate(!!!rlang::set_names(rep(list(0), length(missing)), missing))
+  }
+
   df |>
     mutate(
       fg_pct = coalesce(fgm / fga, 0),

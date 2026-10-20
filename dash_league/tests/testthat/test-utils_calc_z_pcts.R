@@ -41,3 +41,27 @@ test_that("a zero-attempt row is not an error", {
   expect_no_error(calc_z_pcts(z_pcts_fixture()))
   expect_no_warning(z_pcts_fixture() |> calc_z_pcts())
 })
+
+test_that("an empty frame keeps the expected columns", {
+  out <- calc_z_pcts(tibble(
+    player = character(),
+    fgm = numeric(),
+    fga = numeric(),
+    ftm = numeric(),
+    fta = numeric()
+  ))
+
+  expect_equal(nrow(out), 0L)
+  expect_true(all(c("fg_pct", "ft_pct", "fg_z", "ft_z") %in% names(out)))
+})
+
+test_that("missing shooting columns are added as zero", {
+  out <- calc_z_pcts(tibble(player = "A", pts = 10))
+
+  expect_equal(out$fgm, 0)
+  expect_equal(out$fga, 0)
+  expect_equal(out$ftm, 0)
+  expect_equal(out$fta, 0)
+  expect_equal(out$fg_pct, 0)
+  expect_true(all(c("fg_z", "ft_z") %in% names(out)))
+})

@@ -84,7 +84,6 @@ dfs_fty_roster <-
     select(df_nba_season_segments, starts_with("season"), begin_date, end_date),
     by = join_by(season, assigned_date >= begin_date, assigned_date <= end_date)
   ) |>
-  filter(season_type == "Regular Season") |>
   nest_by(league_id) |>
   deframe()
 
@@ -107,6 +106,13 @@ df_fty_box_score <-
     names_from = category,
     values_from = value
   ) |>
+  (\(df) {
+    missing <- setdiff(player_stat_cols, names(df))
+    if (length(missing) > 0) {
+      df <- mutate(df, !!!purrr::set_names(rep(list(0), length(missing)), missing))
+    }
+    df
+  })() |>
   group_by(league_id, matchup) |>
   calc_z_pcts() |>
   ungroup()
@@ -183,6 +189,11 @@ ls_fty_lookup <- list(
     deframe()
 )
 
+cur_season_start <- df_nba_season_segments |>
+  filter(season == cur_season, season_type == "Regular Season") |>
+  pull(begin_date)
+cur_season_start <- if (length(cur_season_start) == 0) as.Date(NA) else min(cur_season_start)
+
 usethis::use_data(
   df_fty_base,
   dfs_fty_schedule,
@@ -191,5 +202,6 @@ usethis::use_data(
   ls_lo_lg_cats,
   df_fty_cat_weights,
   ls_fty_lookup,
+  cur_season_start,
   overwrite = TRUE
 )

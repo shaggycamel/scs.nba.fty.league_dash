@@ -91,7 +91,9 @@ mod_player_comparison_server <- function(id, rv_carry_thru, rv_copy_teams) {
           pluck(
             as.character(rv_carry_thru$league_id),
             as.character(input$window)
-          ) |>
+          )
+        req(ls)
+        ls <- ls |>
           filter(!is.na(player_id), !is.na(player_name)) |>
           arrange(desc(min))
 
@@ -130,7 +132,9 @@ mod_player_comparison_server <- function(id, rv_carry_thru, rv_copy_teams) {
 
     df_comparison <- reactive({
       df <- dfs_player_comparison |>
-        pluck(as.character(rv_carry_thru$league_id), as.character(input$window)) |>
+        pluck(as.character(rv_carry_thru$league_id), as.character(input$window))
+      req(df)
+      df <- df |>
         filter(min >= input$minute_filter)
 
       if (input$free_agent_filter) {

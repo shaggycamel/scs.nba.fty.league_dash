@@ -1,3 +1,16 @@
+all_star_dates <-
+  tbl(db_con, I("nba.key_dates")) |>
+  filter(season >= prev_season, season_type == "All Star") |>
+  as_tibble() |>
+  (\(df) {
+    if (nrow(df) == 0) {
+      as.Date(character())
+    } else {
+      do.call(c, map2(df$begin_date, df$end_date, seq.Date, by = "day"))
+    }
+  })()
+
+
 # Player box score -------------------------------------------------------
 
 df_nba_player_box_score <-
@@ -14,7 +27,8 @@ df_nba_player_box_score <-
   ) |>
 
   # add distinct here just in case...ideally should fix duplicates in source
-  distinct()
+  distinct() |>
+  filter(!game_date %in% all_star_dates)
 
 
 # NBA Schedule -----------------------------------------------------------
@@ -45,7 +59,11 @@ df_nba_schedule <-
     weekday = wday(game_date, label = TRUE, week_start = 1),
     weekday_date = str_c(weekday, " ", format(game_date, "(%d/%m)")),
     scheduled_to_play = ifelse(!is.na(game_id), 1L, game_id) # used in h2h calculations
-  )
+  ) |>
+  filter(!game_date %in% all_star_dates)
+
+stopifnot(!any(df_nba_player_box_score$game_date %in% all_star_dates))
+stopifnot(!any(df_nba_schedule$game_date %in% all_star_dates))
 
 
 # Season segments --------------------------------------------------------
@@ -216,6 +234,7 @@ ls_player_game_log <-
 cache_dir <- here::here("data-raw", "cache")
 dir.create(cache_dir, showWarnings = FALSE, recursive = TRUE)
 save(
+  all_star_dates,
   df_nba_player_box_score,
   df_nba_schedule,
   df_nba_season_segments,

@@ -185,6 +185,18 @@ dfs_fty_standings <-
   group_modify(\(df_lg, ...) {
     scoring_type <- unique(df_lg$scoring_type)
 
+    if (nrow(df_lg) == 0 || length(scoring_type) == 0) {
+      return(tibble(
+        competitor_id = integer(),
+        competitor_name = character(),
+        wins = integer(),
+        losses = integer(),
+        ties = integer(),
+        pct = double(),
+        rank = integer()
+      ))
+    }
+
     df_standings <- if (scoring_type == "H2H_CATEGORY") {
       summarise(
         df_lg,
