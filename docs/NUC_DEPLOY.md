@@ -37,6 +37,14 @@ Read this whole file before running anything. Prefer `DRY_RUN=1` first.
   - `HUGGINGFACE_TOKEN` — HF token with **write** access to the Spaces (required).
   - `DOCKERHUB_USER` (default `shaggycamel`) and `NBA_HF_OWNER` (default `shaggycamel`).
 
+  The shared handoff key lives outside the repo in
+  `~/.config/scs_hf_league_deploy.ini` (mode `600`):
+
+  ```ini
+  [handoff]
+  NBA_HANDOFF_SECRET=<64 hex characters>
+  ```
+
   The current season is defined only in `core::nba_season()`; do not configure
   `NBA_SEASON` in `.profile` or Hugging Face Space variables.
 
@@ -57,6 +65,7 @@ cd ~/shaggy_camel_sports/nba/fty/league_dash
 git pull                      # MUST be up to date; see §3
 docker info >/dev/null && echo docker-ok
 test -f ~/.config/scs_hub_credentials.ini && echo ini-ok
+test -f ~/.config/scs_hf_league_deploy.ini && echo handoff-ini-ok
 set -a; source ./.profile; set +a
 for v in DOCKERHUB_TOKEN HUGGINGFACE_TOKEN; do
   [ -n "${!v:-}" ] && echo "$v set" || echo "$v MISSING"
@@ -80,23 +89,31 @@ Owner defaults to `shaggycamel`; Space prefix is empty; image prefix is
 |--------|----------|-----|
 | Entry point | `shaggycamel/entry` | `https://shaggycamel-entry.hf.space` |
 | League ESPN 95537 | `shaggycamel/espn-95537` | `https://shaggycamel-espn-95537.hf.space` |
-| League ESPN 1382487116 | `shaggycamel/espn-1382487116` | `…-espn-1382487116.hf.space` |
+| League ESPN 1440301458 | `shaggycamel/espn-1440301458` | `…-espn-1440301458.hf.space` |
+| League ESPN 1484259390 | `shaggycamel/espn-1484259390` | `…-espn-1484259390.hf.space` |
 | League ESPN 1966813226 | `shaggycamel/espn-1966813226` | `…-espn-1966813226.hf.space` |
-| League ESPN 24608 | `shaggycamel/espn-24608` | `…-espn-24608.hf.space` |
+
+Active leagues are read from `fty.league` for `core::nba_season()`; this table is
+illustrative. The retired `espn-1382487116` and `espn-24608` Spaces are not part
+of 2026-27 and are not deployed.
 
 Docker images: `shaggycamel/scs.nba.fty.league_dash-espn-<league_id>:latest`; entry
 `shaggycamel/scs.nba.fty.league_dash_entry:latest`. Base image: `scs.nba.fty.league_dash_base:latest`.
 
-`NBA_HANDOFF_SECRET` is an arbitrary shared HMAC key (no default). Generate once
-and use the **same** value on the entry Space and every league Space:
-
-```bash
-openssl rand -hex 32
-```
+`NBA_HANDOFF_SECRET` is an arbitrary shared HMAC key (no default). It lives only
+in `~/.config/scs_hf_league_deploy.ini` (mode `600`), never in the repo or
+`.profile`. The deploy adapter reads it to configure and rotate Spaces.
 
 ## 5. Build + deploy
 
 Run from the repo root. Source the tokens first, and always dry-run first.
+
+When `dash_core` changes (including the season), rebuild the base image before
+the dry run so the league list uses the new code, or use `REBUILD_BASE=1`:
+
+```bash
+docker build -f ./docker/Dockerfile_base --progress=plain -t scs.nba.fty.league_dash_base:latest .
+```
 
 ```bash
 set -a; source ./.profile; set +a
@@ -159,47 +176,52 @@ BUILD_ENTRY=1 bash deploy/cron.sh           # also rebuild/deploy the entry poin
 PROVISION=1 bash deploy/build_entry.sh      # entry only
 ```
 
-## 6. Configure the Spaces (after they exist)
+## 6. Space configuration
 
-Set runtime config on **all** Spaces via the HF API (or the Space settings UI).
-`NBA_HANDOFF_SECRET` must be identical everywhere.
+`deploy/hf.sh` configures Spaces through the HF API during provisioning and
+deployment. It reads the shared handoff key from
+`~/.config/scs_hf_league_deploy.ini` (mode `600`):
+
+```ini
+[handoff]
+NBA_HANDOFF_SECRET=<64 hex characters>
+```
+
+- Entry: ensures `NBA_HANDOFF_SECRET` only. The entry's `NBA_DB_HOST`,
+  `NBA_DB_USER`, `NBA_DB_PASSWORD`, `NBA_DB_PORT`, and `NBA_DB_NAME` secrets are
+  pre-existing and managed separately.
+- League Spaces: ensures `NBA_HANDOFF_SECRET` and `NBA_REQUIRE_HANDOFF=1`.
+- Never set `NBA_SEASON` or `NBA_DB_SECTION` on a Space; the season comes only
+  from `core::nba_season()`.
+- Leagues found by `PROVISION=1` are created and configured automatically.
+
+Normal runs add a missing secret or variable only. To rotate the shared handoff
+key, update the INI and set `ROTATE_HANDOFF_SECRET=1` for the run:
 
 ```bash
-HF="$HUGGINGFACE_TOKEN"
-SECRET="<the sha256 hex you generated>"
+ROTATE_HANDOFF_SECRET=1 PROVISION=1 BUILD_ENTRY=1 bash deploy/cron.sh
+```
 
-# per Space repo id (entry + each league)
-for REPO in \
-  shaggycamel/entry \
-  shaggycamel/espn-95537 \
-  shaggycamel/espn-1382487116 \
-  shaggycamel/espn-1966813226 \
-  shaggycamel/espn-24608
-do
-  curl -sf -X POST "https://huggingface.co/api/spaces/$REPO/secrets" \
-    -H "Authorization: Bearer $HF" -H "Content-Type: application/json" \
-    -d "{\"key\":\"NBA_HANDOFF_SECRET\",\"value\":\"$SECRET\",\"description\":\"handoff HMAC key\"}"
+Rotation restarts the affected Spaces; entry and every league must use the same
+key.
 
-  curl -sf -X POST "https://huggingface.co/api/spaces/$REPO/variables" \
-    -H "Authorization: Bearer $HF" -H "Content-Type: application/json" \
-    -d '{"key":"NBA_DB_SECTION","value":"cockroach-read"}'
+Remove legacy variables once with the adapter helpers (this restarts each Space):
 
+```bash
+set -a; source ./.profile; set +a
+source deploy/adapter.sh
+for slug in entry espn-95537 espn-1966813226; do
+  repo="$(hf_space_id "$slug")"
+  role=league; [ "$slug" = entry ] && role=entry
+  hf_cleanup_legacy_vars "$repo" "$role"
 done
 ```
 
-Additionally, on **league** Spaces only, set strict mode so a container refuses to
-run without a valid entry token:
+This removes `NBA_SEASON` from each Space and, for entry only, the redundant
+`NBA_DB_SSLMODE` and `NBA_HF_SPACE_PREFIX` variables.
 
-```bash
-curl -sf -X POST "https://huggingface.co/api/spaces/shaggycamel/espn-95537/variables" \
-  -H "Authorization: Bearer $HF" -H "Content-Type: application/json" \
-  -d '{"key":"NBA_REQUIRE_HANDOFF","value":"1"}'
-# repeat for the other league Spaces
-```
-
-Secrets/variables require a Space restart to take effect — the deploy step in §5
-already restarts, so set these **then re-run** the relevant stage (§5.1) or restart
-the Space.
+Secrets and variables take effect after a Space restart; the deploy step in §5
+already restarts Spaces.
 
 ## 7. Set customer passwords
 

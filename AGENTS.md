@@ -59,6 +59,9 @@ does entry only. It takes an optional cadence arg (`daily`/`intraday`, default
 `all`) and appends best-effort `dashboard:*` rows to `util.update_log` via
 `core::log_update()` (`cockroach-write`), each stamped with `source` (this repo's
 name, from the git remote) and `job_kickoff` (the run start).
+The HF adapter reads the shared handoff key from
+`~/.config/scs_hf_league_deploy.ini` (mode 600), configures missing Space
+secrets/variables, and rotates with `ROTATE_HANDOFF_SECRET=1`.
 Always `DRY_RUN=1` first. Docker build context is the repo root; `.dockerignore`
 excludes `dash_league/{data,data-raw,dev,tests,man}`, `docs/`, and `e2e/`.
 Full runbook: `docs/NUC_DEPLOY.md` (load on demand — do not preload).
@@ -66,10 +69,12 @@ Full runbook: `docs/NUC_DEPLOY.md` (load on demand — do not preload).
 ## Conventions / gotchas
 
 - Never commit secrets. DB creds live in `~/.config/scs_hub_credentials.ini`;
-  tokens in `./.profile` (git-ignored); e2e creds in `~/.config/scs_e2e.env`.
-- Runtime config via env: `NBA_DB_SECTION`, `NBA_HANDOFF_SECRET`,
-  `NBA_REQUIRE_HANDOFF`. The current season is defined only by
-  `core::nba_season()`.
+  tokens in `./.profile` (git-ignored); the handoff key in
+  `~/.config/scs_hf_league_deploy.ini` (mode 600); e2e creds in
+  `~/.config/scs_e2e.env`.
+- `NBA_DB_SECTION` selects the build-time/local database. Space runtime uses
+  `NBA_HANDOFF_SECRET` and `NBA_REQUIRE_HANDOFF`. The current season is defined
+  only by `core::nba_season()`; do not set `NBA_SEASON` on Spaces.
 - Handoff security: `entry` signs an HMAC token; league containers verify it.
   `NBA_HANDOFF_SECRET` must be identical on the entry and every league Space.
 - `scripts/` is git-ignored. It holds `set_customer_password.R` (sets

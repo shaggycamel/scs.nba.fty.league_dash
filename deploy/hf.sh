@@ -6,6 +6,8 @@
 
 : "${HF_OWNER:=shaggycamel}"
 : "${HF_IMAGE_BASENAME:=scs.nba.fty.league_dash}"
+HF_DEPLOY_INI="${HF_DEPLOY_INI:-$HOME/.config/scs_hf_league_deploy.ini}"
+HF_HANDOFF_KEY="${HF_HANDOFF_KEY:-NBA_HANDOFF_SECRET}"
 
 hf_space_id() {
   echo "${HF_OWNER}/${1}"
@@ -13,6 +15,129 @@ hf_space_id() {
 
 adapter_url() {
   echo "https://${HF_OWNER}-${1}.hf.space"
+}
+
+hf_space_exists() {
+  local repo="$1"
+  local status
+  status="$(curl -s -o /dev/null -w '%{http_code}' \
+    -H "Authorization: Bearer ${HUGGINGFACE_TOKEN}" \
+    "https://huggingface.co/api/spaces/${repo}")"
+  [ "$status" = "200" ]
+}
+
+hf_space_keys() {
+  local repo="$1" kind="$2"
+  curl -s -H "Authorization: Bearer ${HUGGINGFACE_TOKEN}" \
+    "https://huggingface.co/api/spaces/${repo}/${kind}" \
+    | python3 -c 'import json,sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+if isinstance(data, dict):
+    print("\n".join(sorted(data.keys())))'
+}
+
+hf_space_variable_value() {
+  local repo="$1" key="$2"
+  curl -s -H "Authorization: Bearer ${HUGGINGFACE_TOKEN}" \
+    "https://huggingface.co/api/spaces/${repo}/variables" \
+    | python3 -c 'import json,sys
+key = sys.argv[1]
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+value = data.get(key, {})
+print(value.get("value", "") if isinstance(value, dict) else "")' "$key"
+}
+
+hf_space_secret_json() {
+  python3 - "$HF_DEPLOY_INI" "$HF_HANDOFF_KEY" <<'PY'
+import configparser
+import json
+import sys
+
+ini, key = sys.argv[1], sys.argv[2]
+parser = configparser.ConfigParser()
+if not parser.read(ini):
+    sys.exit(f"deploy INI not found: {ini}")
+if not parser.has_section("handoff") or not parser.has_option("handoff", key):
+    sys.exit(f"[handoff] {key} missing from {ini}")
+value = parser.get("handoff", key).strip()
+if not value:
+    sys.exit(f"[handoff] {key} is empty in {ini}")
+print(json.dumps({"key": key, "value": value, "description": "handoff HMAC key"}))
+PY
+}
+
+hf_space_set_secret() {
+  local repo="$1"
+  local json
+  json="$(hf_space_secret_json)" || return 1
+  printf '%s' "$json" | curl -sf -X POST "https://huggingface.co/api/spaces/${repo}/secrets" \
+    -H "Authorization: Bearer ${HUGGINGFACE_TOKEN}" \
+    -H "Content-Type: application/json" \
+    --data-binary @- >/dev/null || return 1
+  unset json
+}
+
+hf_space_set_variable() {
+  local repo="$1" key="$2" value="$3"
+  local json
+  json="$(python3 -c 'import json,sys; print(json.dumps({"key": sys.argv[1], "value": sys.argv[2]}))' "$key" "$value")" || return 1
+  printf '%s' "$json" | curl -sf -X POST "https://huggingface.co/api/spaces/${repo}/variables" \
+    -H "Authorization: Bearer ${HUGGINGFACE_TOKEN}" \
+    -H "Content-Type: application/json" \
+    --data-binary @- >/dev/null || return 1
+  unset json
+}
+
+hf_space_delete_variable() {
+  local repo="$1" key="$2"
+  local json
+  json="$(python3 -c 'import json,sys; print(json.dumps({"key": sys.argv[1]}))' "$key")" || return 1
+  printf '%s' "$json" | curl -sf -X DELETE "https://huggingface.co/api/spaces/${repo}/variables" \
+    -H "Authorization: Bearer ${HUGGINGFACE_TOKEN}" \
+    -H "Content-Type: application/json" \
+    --data-binary @- >/dev/null || return 1
+  unset json
+}
+
+hf_apply_space_config() {
+  local repo="$1" role="$2"
+  local keys
+  keys="$(hf_space_keys "$repo" secrets)"
+  if [ "${ROTATE_HANDOFF_SECRET:-0}" = "1" ] \
+    || ! printf '%s\n' "$keys" | grep -qx "$HF_HANDOFF_KEY"; then
+    echo "[hf] setting handoff secret on ${repo}"
+    hf_space_set_secret "$repo" || return 1
+  fi
+  if [ "$role" = "league" ] && [ "$(hf_space_variable_value "$repo" NBA_REQUIRE_HANDOFF)" != "1" ]; then
+    echo "[hf] setting NBA_REQUIRE_HANDOFF on ${repo}"
+    hf_space_set_variable "$repo" NBA_REQUIRE_HANDOFF 1 || return 1
+  fi
+}
+
+hf_cleanup_legacy_vars() {
+  local repo="$1" role="$2"
+  local keys key
+  keys="$(hf_space_keys "$repo" variables)"
+  for key in NBA_SEASON; do
+    if printf '%s\n' "$keys" | grep -qx "$key"; then
+      echo "[hf] removing ${key} from ${repo}"
+      hf_space_delete_variable "$repo" "$key" || return 1
+    fi
+  done
+  if [ "$role" = "entry" ]; then
+    for key in NBA_DB_SSLMODE NBA_HF_SPACE_PREFIX; do
+      if printf '%s\n' "$keys" | grep -qx "$key"; then
+        echo "[hf] removing ${key} from ${repo}"
+        hf_space_delete_variable "$repo" "$key" || return 1
+      fi
+    done
+  fi
 }
 
 # Resolve an image tag to its immutable digest (repo@sha256:...) via the Docker
@@ -186,6 +311,7 @@ adapter_provision() {
       -d "{\"type\":\"space\",\"name\":\"${name}\",\"private\":false,\"sdk\":\"docker\"}" >/dev/null || return 1
   fi
 
+  hf_apply_space_config "$repo" "$app" || return 1
   hf_configure_space "$repo" "$image" "$app" || return 1
   echo "[hf] configured ${repo} (FROM ${image})"
   hf_wait_healthy "$repo" "$(hf_space_head "$repo")" "${HF_HEALTH_TIMEOUT:-900}" || return 1
@@ -210,6 +336,8 @@ adapter_deploy() {
   fi
 
   : "${HUGGINGFACE_TOKEN:?HUGGINGFACE_TOKEN is required for HF deploys}"
+
+  hf_apply_space_config "$repo" "$app" || return 1
 
   # The commit is what guarantees a fresh image; it must succeed.
   hf_configure_space "$repo" "$image" "$app" || return 1
