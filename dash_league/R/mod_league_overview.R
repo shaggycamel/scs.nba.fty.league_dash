@@ -52,6 +52,7 @@ mod_league_overview_ui <- function(id) {
 #'
 mod_league_overview_server <- function(id, rv_carry_thru) {
   moduleServer(id, function(input, output, session) {
+    ns <- session$ns
     season_start <- get0("cur_season_start", envir = asNamespace("league"), ifnotfound = NULL)
 
     # Update categories ------------------------------------------------------

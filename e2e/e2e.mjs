@@ -160,6 +160,26 @@ try {
         entry.verdict = verdict;
         if (verdict === "sign-in-required") entry.notes.push("handoff rejected");
         if (verdict === "unknown") entry.notes.push("no dashboard detected");
+        if (verdict.startsWith("dashboard:")) {
+          const overview = frame.getByText("Overview", { exact: true }).first();
+          if (await overview.count()) {
+            await overview.click();
+            const trend = frame.getByText("Category Trend", { exact: true }).first();
+            if (await trend.count()) {
+              await trend.click();
+              await page.waitForTimeout(1500);
+              const trendBody = await frame.locator("body").innerText().catch(() => "");
+              const shinyErrors = await frame.locator(".shiny-error").count().catch(() => 0);
+              if (shinyErrors > 0 || /could not find function/i.test(trendBody)) {
+                entry.notes.push("category trend error");
+              }
+            } else {
+              entry.notes.push("category trend tab not found");
+            }
+          } else {
+            entry.notes.push("overview nav not found");
+          }
+        }
         entry.ok = verdict.startsWith("dashboard:") && entry.notes.length === 0;
       }
 
