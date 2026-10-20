@@ -215,7 +215,7 @@ hf_runtime() {
 # factory reboot, then keeps waiting. Returns non-zero if it never converges.
 hf_wait_healthy() {
   local repo="$1" expected="$2" timeout="${3:-900}" grace="${HF_HEAL_GRACE:-90}"
-  local waited=0 healed=0 runtime sha stage url last_sha="" last_stage="" http_timeout="${HF_HTTP_TIMEOUT:-10}"
+  local waited=0 healed=0 woke=0 runtime sha stage url last_sha="" last_stage="" http_timeout="${HF_HTTP_TIMEOUT:-10}"
   url="$(adapter_url "${repo##*/}")"
 
   while [ "$waited" -lt "$timeout" ]; do
@@ -229,6 +229,13 @@ hf_wait_healthy() {
       if curl -fsSL --max-time "$http_timeout" -o /dev/null "${url}/" 2>/dev/null; then
         return 0
       fi
+    fi
+
+    if { [ "$stage" = "PAUSED" ] || [ "$stage" = "STOPPED" ]; } && [ "$woke" = "0" ]; then
+      echo "[hf] WARN: ${repo} is ${stage}; restarting" >&2
+      curl -sf -X POST "https://huggingface.co/api/spaces/${repo}/restart" \
+        -H "Authorization: Bearer ${HUGGINGFACE_TOKEN}" >/dev/null 2>&1 || true
+      woke=1
     fi
 
     # Only heal a Space that is up but stuck on its previous commit. While it is
