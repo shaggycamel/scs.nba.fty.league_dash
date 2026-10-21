@@ -247,7 +247,7 @@ hf_wait_healthy() {
       fi
     fi
 
-    if { [ "$stage" = "PAUSED" ] || [ "$stage" = "STOPPED" ]; } && [ "$woke" = "0" ]; then
+    if { [ "$stage" = "PAUSED" ] || [ "$stage" = "STOPPED" ] || [ "$stage" = "SLEEPING" ]; } && [ "$woke" = "0" ]; then
       echo "[hf] WARN: ${repo} is ${stage}; restarting" >&2
       curl -sf -X POST "https://huggingface.co/api/spaces/${repo}/restart" \
         -H "Authorization: Bearer ${HUGGINGFACE_TOKEN}" >/dev/null 2>&1 || true
