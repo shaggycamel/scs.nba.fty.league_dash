@@ -105,6 +105,15 @@ df_nba_roster <- tbl(db_con, I("nba.team_roster_vw")) |>
   mutate(across(ends_with("_id"), \(x) as.integer(x)))
 
 
+# Current injuries -------------------------------------------------------
+
+min_inj_date <- as.Date(cur_date - days(30))
+df_nba_injuries_recent <-
+  tbl(db_con, I("nba.injuries")) |>
+  filter(game_date >= min_inj_date) |>
+  as_tibble()
+
+
 # Player rolling stats ---------------------------------------------------
 
 dfs_rolling_stats <- df_nba_player_box_score |>
@@ -139,6 +148,7 @@ dfs_rolling_stats <- df_nba_player_box_score |>
             ),
             relationship = "many-to-many"
           ) |>
+          attach_current_injury_status(df_nba_injuries_recent, cur_date) |>
           select(
             player_id,
             espn_id,
@@ -161,11 +171,8 @@ dfs_rolling_stats <- df_nba_player_box_score |>
             relationship = "many-to-many"
           )
       ) |>
-      mutate(inj_status = if_else(game_date < cur_date, coalesce(inj_status, "Available"), inj_status)) |>
-      arrange(game_date) |>
-      group_by(player_id) |>
-      fill(inj_status, .direction = "down") |>
-      ungroup()
+      mutate(inj_status = coalesce(inj_status, "Available")) |>
+      arrange(game_date)
   }) |>
   map(\(df_t) {
     bind_rows(
@@ -184,11 +191,9 @@ dfs_rolling_stats <- df_nba_player_box_score |>
 
 # Recent injuries (shared) -----------------------------------------------
 
-min_inj_date <- as.Date(cur_date - days(30))
 df_ns_injuries <-
-  tbl(db_con, I("nba.injuries")) |>
-  filter(game_date >= min_inj_date, status == "Out") |>
-  as_tibble() |>
+  df_nba_injuries_recent |>
+  filter(status == "Out") |>
   mutate(
     across(ends_with("_id"), \(x) as.integer(x)),
     opponent = str_remove(matchup, "@"),
