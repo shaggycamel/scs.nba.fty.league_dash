@@ -58,3 +58,20 @@ test_that("player comparison includes every scored league category", {
     expect_length(setdiff(requested, available), 0)
   }
 })
+
+test_that("every built league has free-agent future games", {
+  pkg <- as.environment("package:league")
+  skip_if_not(rlang::env_has(pkg, "dfs_h2h_future"), "package data not built")
+
+  future <- pkg[["dfs_h2h_future"]]
+  for (lg in names(future)) {
+    windows <- purrr::pluck(future, lg, "free_agent", "free_agent")
+    expected <- c("7", "15", "30")
+    expect_type(windows, "list")
+    expect_true(all(expected %in% names(windows)))
+    for (window in expected) {
+      expect_gt(nrow(windows[[window]]), 0)
+      expect_true(all(windows[[window]]$matchup_start <= windows[[window]]$matchup_end))
+    }
+  }
+})

@@ -81,11 +81,7 @@ dfs_h2h_future_generation <- function() {
       matchup_period = if_else(competitor_id == "free_agent", "free_agent", matchup_period),
       scheduled_to_play = 1
     ) |>
-    mutate(
-      matchup_start = replace_na(matchup_start, max(matchup_start, na.rm = TRUE)),
-      matchup_end = replace_na(matchup_end, max(matchup_end, na.rm = TRUE)),
-      .by = league_id
-    ) |>
+    fill_free_agent_window() |>
 
     # Rolling stats
     left_join(
