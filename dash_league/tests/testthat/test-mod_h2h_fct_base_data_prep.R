@@ -22,20 +22,31 @@ base_fixtures <- function() {
             "7" = tibble(
               player_id = c(10L, 11L),
               game_date = c(cur_date + 1, cur_date + 2),
-              pts = c(3, 4)
+              pts = c(3, 4),
+              matchup_start = cur_date - 1,
+              matchup_end = cur_date + 3
             )
           ),
           "2" = list(
-            "7" = tibble(player_id = 20L, game_date = cur_date + 1, pts = 6)
+            "7" = tibble(
+              player_id = 20L,
+              game_date = cur_date + 1,
+              pts = 6,
+              matchup_start = cur_date - 1,
+              matchup_end = cur_date + 3
+            )
           )
         ),
         # Free agents are stored under a "free_agent" matchup, not a real one.
+        # Their dates span the rest of the season in the built data.
         "free_agent" = list(
           "free_agent" = list(
             "7" = tibble(
               player_id = 30L,
-              game_date = cur_date + 2,
-              pts = 2
+              game_date = c(cur_date + 2, cur_date + 4, cur_date + 10),
+              pts = c(2, 1, 9),
+              matchup_start = cur_date - 1,
+              matchup_end = cur_date + 100
             )
           )
         )
@@ -121,6 +132,21 @@ test_that("an add brings a free agent's games into the current matchup", {
   out <- base_prep(base_input(), base_rv(), base_opponent(), moves)
 
   expect_true(30L %in% filter(out, competitor == "Me")$player_id)
+})
+
+test_that("an added free agent is confined to the current matchup", {
+  moves <- list(list(
+    action = "add",
+    player_id = 30L,
+    action_date = as.character(cur_date)
+  ))
+  out <- base_prep(base_input(), base_rv(), base_opponent(), moves)
+  fa <- filter(out, player_id == 30L)
+
+  expect_equal(nrow(fa), 2L)
+  expect_equal(fa$matchup_start, c(cur_date - 1, cur_date - 1))
+  expect_equal(fa$matchup_end, c(cur_date + 3, cur_date + 3))
+  expect_equal(fa$matchup_end_plus, c(NA, cur_date + 5))
 })
 
 test_that("a move dated before today has already been applied and is ignored", {

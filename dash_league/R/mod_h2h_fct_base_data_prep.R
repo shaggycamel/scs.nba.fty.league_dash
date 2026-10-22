@@ -34,12 +34,25 @@ base_data_prep <- function(input, rv_carry_thru, opponent, rv_alter_team) {
               (\(df) {
                 # fmt: skip
                 if (!is.null(ex)) df <- anti_join(df, ex, by = join_by(player_id, game_date >= action_date))
-                if (!is.null(add)) {
+                if (!is.null(add) && nrow(df) > 0) {
+                  current_start <- min(df$matchup_start, na.rm = TRUE)
+                  current_end <- max(df$matchup_end, na.rm = TRUE)
+
                   df <- df |>
                     bind_rows(
                       dfs_h2h_future |>
                         pluck(l_id, "free_agent", "free_agent", input$window) |>
-                        inner_join(add, by = join_by(player_id, game_date >= action_date))
+                        inner_join(add, by = join_by(player_id, game_date >= action_date)) |>
+                        filter(game_date <= current_end + 2) |>
+                        mutate(
+                          matchup_start = current_start,
+                          matchup_end = current_end,
+                          matchup_end_plus = if_else(
+                            game_date > current_end,
+                            current_end + 2,
+                            NA_Date_
+                          )
+                        )
                     )
                 }
                 df
