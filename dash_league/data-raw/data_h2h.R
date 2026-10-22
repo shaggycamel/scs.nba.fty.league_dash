@@ -123,7 +123,10 @@ dfs_h2h_future_generation <- function() {
     ) |>
     mutate(fmt_date = format(game_date, "%a (%d/%m)")) |>
     distinct() |> # FOR SAFETY
-    filter(matchup_period != "99" | game_date == min(game_date), .by = c(league_id, competitor_id, player_id, matchup_period))
+    filter(
+      matchup_period != "99" | game_date == min(game_date),
+      .by = c(league_id, competitor_id, player_id, matchup_period)
+    )
 
   # Add matchup lookahead
   # Not sure how this will look when cur_date == matchup_end
