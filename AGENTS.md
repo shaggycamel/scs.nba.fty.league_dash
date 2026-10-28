@@ -62,7 +62,7 @@ name, from the git remote) and `job_kickoff` (the run start).
 The HF adapter reads the shared handoff key from
 `~/.config/scs_hf_league_deploy.ini` (mode 600), configures missing Space
 secrets/variables, and rotates with `ROTATE_HANDOFF_SECRET=1`. New Spaces use
-the `[space]` hardware/sleep settings (`cpu-upgrade`, 900s by default).
+the `[space]` hardware/sleep settings (`cpu-upgrade`, 300s by default).
 Always `DRY_RUN=1` first. Docker build context is the repo root; `.dockerignore`
 excludes `dash_league/{data,data-raw,dev,tests,man}`, `docs/`, and `e2e/`.
 Full runbook: `docs/NUC_DEPLOY.md` (load on demand — do not preload).

@@ -332,13 +332,14 @@ fi
 # HF can keep serving a Space's previous build (RUNNING but on an old commit),
 # which is how the entry ends up rejecting a valid password after a league-only
 # deploy. Verify the entry is on its current commit, forcing a factory reboot if
-# not. League Spaces are verified inside adapter_deploy. No-op for non-HF
-# providers (the health helpers only exist for HF).
+# not. A SLEEPING entry is left asleep (wake=0); it rebuilds HEAD when next woken.
+# League Spaces are verified inside adapter_deploy. No-op for non-HF providers
+# (the health helpers only exist for HF).
 if [ "$DRY_RUN" != "1" ] && command -v hf_wait_healthy >/dev/null 2>&1; then
   step "Verifying the entry Space is on its current build"
   ENTRY_REPO="$(hf_space_id "${ENTRY_SLUG:-entry}")"
-  if hf_wait_healthy "$ENTRY_REPO" "$(hf_space_head "$ENTRY_REPO")" "${HF_HEALTH_TIMEOUT:-900}"; then
-    printf "✔ %s healthy\n" "$ENTRY_REPO"
+  if hf_wait_healthy "$ENTRY_REPO" "$(hf_space_head "$ENTRY_REPO")" "${HF_HEALTH_TIMEOUT:-900}" 0; then
+    printf "✔ %s ok\n" "$ENTRY_REPO"
   else
     printf "✘ %s FAILED health check\n" "$ENTRY_REPO"
     mark_failed "entry-health"

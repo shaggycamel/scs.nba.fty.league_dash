@@ -47,7 +47,7 @@ Read this whole file before running anything. Prefer `DRY_RUN=1` first.
 
   [space]
   hardware=cpu-upgrade
-  sleep_time=900
+  sleep_time=300
   ```
 
   New Spaces use `hardware` and `sleep_time` from `[space]`; existing Spaces keep
@@ -197,7 +197,7 @@ NBA_HANDOFF_SECRET=<64 hex characters>
 
 [space]
 hardware=cpu-upgrade
-sleep_time=900
+sleep_time=300
 ```
 
 - Entry: ensures `NBA_HANDOFF_SECRET` only. The entry's `NBA_DB_HOST`,

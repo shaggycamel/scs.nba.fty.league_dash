@@ -229,8 +229,9 @@ hf_runtime() {
 # responds. HF sometimes leaves a Space RUNNING on its previous build (it did
 # not rebuild), which serves a stale image; this detects that and forces a
 # factory reboot, then keeps waiting. Returns non-zero if it never converges.
+# With wake=0 (fourth arg), a SLEEPING/PAUSED/STOPPED Space is accepted as-is.
 hf_wait_healthy() {
-  local repo="$1" expected="$2" timeout="${3:-900}" grace="${HF_HEAL_GRACE:-90}"
+  local repo="$1" expected="$2" timeout="${3:-900}" wake="${4:-1}" grace="${HF_HEAL_GRACE:-90}"
   local waited=0 healed=0 woke=0 runtime sha stage url last_sha="" last_stage="" http_timeout="${HF_HTTP_TIMEOUT:-10}"
   url="$(adapter_url "${repo##*/}")"
 
@@ -248,6 +249,10 @@ hf_wait_healthy() {
     fi
 
     if { [ "$stage" = "PAUSED" ] || [ "$stage" = "STOPPED" ] || [ "$stage" = "SLEEPING" ]; } && [ "$woke" = "0" ]; then
+      if [ "$wake" = "0" ]; then
+        echo "[hf] ${repo} is ${stage}; not waking for health check" >&2
+        return 0
+      fi
       echo "[hf] WARN: ${repo} is ${stage}; restarting" >&2
       curl -sf -X POST "https://huggingface.co/api/spaces/${repo}/restart" \
         -H "Authorization: Bearer ${HUGGINGFACE_TOKEN}" >/dev/null 2>&1 || true
@@ -306,7 +311,8 @@ hf_configure_space() {
   echo "[hf] ${repo} -> ${image_ref}"
 }
 
-# Create the Space if missing, then configure its Dockerfile.
+# Create the Space if missing; for an existing Space only apply config and let
+# adapter_deploy do the single rebuild.
 adapter_provision() {
   local slug="$1"
   local image="$2"
@@ -316,9 +322,9 @@ adapter_provision() {
   local hardware="${HF_SPACE_HARDWARE:-$(hf_deploy_config space hardware)}"
   hardware="${hardware:-cpu-upgrade}"
   local sleep_time="${HF_SPACE_SLEEP_TIME:-$(hf_deploy_config space sleep_time)}"
-  sleep_time="${sleep_time:-900}"
+  sleep_time="${sleep_time:-300}"
   case "$sleep_time" in
-    ''|*[!0-9]*) sleep_time=900 ;;
+    ''|*[!0-9]*) sleep_time=300 ;;
   esac
 
   if [ "${DRY_RUN:-0}" = "1" ]; then
@@ -333,13 +339,17 @@ adapter_provision() {
     -H "Authorization: Bearer ${HUGGINGFACE_TOKEN}" \
     "https://huggingface.co/api/spaces/${repo}")"
 
-  if [ "$status" != "200" ]; then
-    echo "[hf] creating ${repo} (${hardware}, sleep ${sleep_time}s)"
-    curl -sf -X POST "https://huggingface.co/api/repos/create" \
-      -H "Authorization: Bearer ${HUGGINGFACE_TOKEN}" \
-      -H "Content-Type: application/json" \
-      -d "{\"type\":\"space\",\"name\":\"${name}\",\"private\":false,\"sdk\":\"docker\",\"hardware\":\"${hardware}\",\"sleepTimeSeconds\":${sleep_time}}" >/dev/null || return 1
+  if [ "$status" = "200" ]; then
+    hf_apply_space_config "$repo" "$app" || return 1
+    echo "[hf] ${repo} exists; deploy will rebuild"
+    return 0
   fi
+
+  echo "[hf] creating ${repo} (${hardware}, sleep ${sleep_time}s)"
+  curl -sf -X POST "https://huggingface.co/api/repos/create" \
+    -H "Authorization: Bearer ${HUGGINGFACE_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d "{\"type\":\"space\",\"name\":\"${name}\",\"private\":false,\"sdk\":\"docker\",\"hardware\":\"${hardware}\",\"sleepTimeSeconds\":${sleep_time}}" >/dev/null || return 1
 
   hf_apply_space_config "$repo" "$app" || return 1
   hf_configure_space "$repo" "$image" "$app" || return 1
