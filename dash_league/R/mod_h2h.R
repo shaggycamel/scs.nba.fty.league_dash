@@ -402,7 +402,7 @@ mod_h2h_server <- function(
       req(as.integer(input$matchup) %in% league_regular_periods())
       base_data_prep(input, rv_carry_thru, opponent, rv_alter_team())
     }) |>
-      bindEvent(opponent(), rv_alter_team(), ignoreInit = FALSE)
+      bindEvent(opponent(), rv_alter_team(), input$future_only, input$window, ignoreInit = FALSE)
 
     df_plt <- reactive({
       if (identical(as.character(input$matchup), "99")) {
@@ -515,6 +515,7 @@ mod_h2h_server <- function(
       }
 
       req(df_tbl_sum(), df_tbl(), df_grey_player())
+      hl_players <- as.numeric(input$hl_player)
 
       mup_end <- unique(na.omit(df_base()$matchup_end))
       # Read off the table rather than df_base, which has no rows for the days
@@ -550,10 +551,12 @@ mod_h2h_server <- function(
         columns = col_fmt_sum,
         defaultExpanded = TRUE,
         details = \(ix) {
+          df_details <- filter(df_tbl(), competitor == df_tbl_sum()$player_team[ix])
+
           tags$div(
             style = "margin-left: 45px; margin-top: 10px; margin-bottom: 30px;",
             reactable(
-              filter(df_tbl(), competitor == df_tbl_sum()$player_team[ix]),
+              df_details,
               pagination = FALSE,
               bordered = TRUE,
               style = list(border = "1px solid #000000"),
@@ -563,7 +566,7 @@ mod_h2h_server <- function(
               defaultColDef = colDef(headerStyle = list(background = "#cce5ff")), # Not sure if needed
               columns = col_fmt,
               rowStyle = function(index) {
-                if (df_tbl()$player_id[index] %in% as.numeric(input$hl_player)) {
+                if (df_details$player_id[index] %in% hl_players) {
                   list(backgroundColor = "#ffef9dff", fontWeight = "bold") # Light yellow highlight
                 }
               },
