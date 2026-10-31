@@ -104,7 +104,7 @@ pin_columns <- function(col_dates, pin_date, matchup_start, matchup_end, pin_dir
 #'
 #' @noRd
 #'
-game_tbl_col_fmt <- function(df, dt, mup_end, col_dates, type = "player") {
+game_tbl_col_fmt <- function(df, dt, mup_end, col_dates, type = "player", starter_count = 10) {
   col_fmt <- map(set_names(str_subset(colnames(df), "\\/")), \(x) {
     nm <- str_split_1(x, " ")
     col_date <- col_dates[[x]]
@@ -119,7 +119,10 @@ game_tbl_col_fmt <- function(df, dt, mup_end, col_dates, type = "player") {
               col_date > coalesce(df$max_grey_date[index], as.Date("3000-01-01")))
         ) {
           list(background = "#d7d7d5", color = "#d7d7d5")
-        } else if (str_detect(as.character(value), "\\*") | as.numeric(str_remove(value, "\\*")) > 10) {
+        } else if (
+          str_detect(as.character(value), "\\*") ||
+            (type == "sum" && isTRUE(as.numeric(str_remove(value, "\\*")) > starter_count))
+        ) {
           list(background = "#ea7878ff")
         } else if (col_date == dt) {
           list(background = "#f1e78e94")
