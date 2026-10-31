@@ -33,7 +33,8 @@ mod_league_overview_ui <- function(id) {
             "Category Trend",
             shinycssloaders::withSpinner(uiOutput(ns("trend_ui")), type = 1, color = "#133DEF")
           )
-        ),
+        ) |>
+          htmltools::tagAppendAttributes(class = "d3-plot-card"),
         card(
           full_screen = TRUE,
           min_height = 200,

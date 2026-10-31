@@ -20,6 +20,13 @@ app_ui <- function(request) {
        .shiny-spinner-output-container > .reactable {
          flex: 1 1 auto; min-height: 0;
        }
+       .r2d3 > svg {
+         display: block;
+       }
+       .bslib-card.d3-plot-card,
+       .bslib-card.d3-plot-card .card-body {
+         overflow: hidden;
+       }
        .navbar .nav-last-update {
          font-size: 0.7rem; font-weight: 400; opacity: 0.85;
          margin-left: 2rem; white-space: nowrap;

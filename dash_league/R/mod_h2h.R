@@ -488,7 +488,7 @@ mod_h2h_server <- function(
 
       card(
         full_screen = TRUE,
-        class = "h2h-plot-card",
+        class = "h2h-plot-card d3-plot-card",
         height = if (collapsed) 200 else 700,
         bslib::card_body(
           padding = 0,

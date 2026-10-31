@@ -5,7 +5,7 @@
 #' @import shiny
 #' @noRd
 app_server <- function(input, output, session) {
-  options(spinner.type = 1, spinner.color = "#133DEF")
+  options(spinner.type = 1, spinner.color = "#133DEF", r2d3.shadow = FALSE)
 
   #
   # ------- Base reactives
