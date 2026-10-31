@@ -117,18 +117,6 @@ function hideTooltip(el) {
 var tooltip = getTooltip("__r2d3Tooltip");
 var tooltipOther = getTooltip("__r2d3TooltipOther");
 
-// This chart animates its own card's height. r2d3 only recalculates on window
-// resizes, so nudge it whenever the card's size changes, otherwise the plot
-// stays at the collapsed height inside the grown card.
-var resizeCard = svgNode.closest(".h2h-plot-card");
-if (resizeCard && window.ResizeObserver) {
-  if (resizeCard.__cardResizeObserver) resizeCard.__cardResizeObserver.disconnect();
-  resizeCard.__cardResizeObserver = new ResizeObserver(function() {
-    window.dispatchEvent(new Event("resize"));
-  });
-  resizeCard.__cardResizeObserver.observe(resizeCard);
-}
-
 r2d3.onRender(function(data, svg, width, height, options) {
   // ---- reshape long data into wide (one row per `name`, one column per competitor) ----
 
@@ -401,48 +389,24 @@ r2d3.onRender(function(data, svg, width, height, options) {
     .attr("width", function(d) { return proportionScale(d.segment[1]) - proportionScale(d.segment[0]); });
 
   // ---- overall-row collapse: collapsed shows only the overall bar in a short
-  // card; clicking asks Shiny to resize the card and re-render expanded, where
-  // the weighted category rows cascade in below the overall bar. ----
+  // card; clicking sends the league id to Shiny, which re-renders the card and
+  // chart at the new size, and the weighted category rows cascade in. ----
 
   var allRects = layersMerged.selectAll("rect");
-
-  var cardAnimating = false;
 
   allRects
     .style("cursor", function(d) {
       return d.segment.data.__overall ? "pointer" : null;
     })
     .on("click", function(event, d) {
-      if (!d.segment.data.__overall || cardAnimating) return;
-
-      var next = !expanded;
-      var cardNode = svg.node().closest(".h2h-plot-card");
-
-      function sendState() {
-        if (window.Shiny && options && options.toggle_input) {
-          Shiny.setInputValue(options.toggle_input, next, { priority: "event" });
-        }
+      if (!d.segment.data.__overall) return;
+      if (window.Shiny && options && options.toggle_input) {
+        Shiny.setInputValue(
+          options.toggle_input,
+          expanded ? "" : String(options.league_id),
+          { priority: "event" }
+        );
       }
-
-      if (!cardNode) {
-        sendState();
-        return;
-      }
-
-      cardAnimating = true;
-
-      d3.select(cardNode)
-        .interrupt("card-resize")
-        .style("overflow", "hidden")
-        .transition("card-resize")
-        .duration(900)
-        .ease(d3.easeCubicInOut)
-        .style("height", (next ? 700 : 200) + "px")
-        .on("end", function() {
-          cardAnimating = false;
-          d3.select(this).style("overflow", null);
-          sendState();
-        });
     });
 
   allRects

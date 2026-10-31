@@ -460,6 +460,13 @@ mod_h2h_server <- function(
         nrow() > 0
     })
 
+    plot_expanded <- reactive({
+      identical(
+        as.character(input$h2h_plot_expanded),
+        as.character(rv_carry_thru$league_id)
+      )
+    })
+
     output$stat_plot <- renderD3({
       req(df_plt())
 
@@ -467,23 +474,30 @@ mod_h2h_server <- function(
         data = df_plt(),
         script = app_sys("d3/h2h_stat_plot/h2h_stat_plot.js"),
         options = list(
-          expanded = isTRUE(input$h2h_plot_expanded),
-          toggle_input = ns("h2h_plot_expanded")
+          expanded = plot_expanded(),
+          toggle_input = ns("h2h_plot_expanded"),
+          league_id = as.character(rv_carry_thru$league_id)
         )
       )
     })
 
     output$plot_card <- renderUI({
       req(rv_carry_thru$fty_parameters_met)
-      # Read the toggle state in isolation: the D3 click animates this card's
-      # height itself, and re-rendering the card here would replace it mid-flight.
-      collapsed <- is_points_league() && !isTRUE(isolate(input$h2h_plot_expanded))
+      points <- is_points_league()
+      collapsed <- points && !plot_expanded()
 
       card(
         full_screen = TRUE,
         class = "h2h-plot-card",
         height = if (collapsed) 200 else 700,
-        shinycssloaders::withSpinner(d3Output(ns("stat_plot"), height = "100%"), type = 1, color = "#133DEF")
+        bslib::card_body(
+          padding = 0,
+          shinycssloaders::withSpinner(
+            d3Output(ns("stat_plot"), height = "100%"),
+            type = 1,
+            color = "#133DEF"
+          )
+        )
       )
     })
 
