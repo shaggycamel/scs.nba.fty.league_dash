@@ -552,41 +552,65 @@ mod_h2h_server <- function(
         type = "sum", starter_count = starter_count
       )
 
-      reactable(
-        df_tbl_sum(),
-        pagination = FALSE,
-        bordered = TRUE,
-        style = list(border = "1px solid #000000"),
-        rowStyle = list(borderBottom = "1px solid #000000"),
-        theme = reactableTheme(headerStyle = list(borderBottom = "1px solid #000000")),
-        highlight = TRUE,
-        sortable = FALSE,
-        defaultColDef = colDef(headerStyle = list(background = "#cce5ff")),
-        columns = col_fmt_sum,
-        defaultExpanded = TRUE,
-        details = \(ix) {
-          df_details <- filter(df_tbl(), competitor == df_tbl_sum()$player_team[ix])
+      htmlwidgets::onRender(
+        reactable(
+          df_tbl_sum(),
+          pagination = FALSE,
+          bordered = TRUE,
+          style = list(border = "1px solid #000000"),
+          rowStyle = list(borderBottom = "1px solid #000000"),
+          theme = reactableTheme(headerStyle = list(borderBottom = "1px solid #000000")),
+          highlight = TRUE,
+          sortable = FALSE,
+          defaultColDef = colDef(headerStyle = list(background = "#cce5ff")),
+          columns = col_fmt_sum,
+          details = \(ix) {
+            df_details <- filter(df_tbl(), competitor == df_tbl_sum()$player_team[ix])
 
-          tags$div(
-            style = "margin-left: 45px; margin-top: 10px; margin-bottom: 30px;",
-            reactable(
-              df_details,
-              pagination = FALSE,
-              bordered = TRUE,
-              style = list(border = "1px solid #000000"),
-              highlight = TRUE,
-              theme = reactableTheme(headerStyle = list(display = "none")),
-              defaultSorted = list(player_team = "asc", player_name = "asc"),
-              defaultColDef = colDef(headerStyle = list(background = "#cce5ff")), # Not sure if needed
-              columns = col_fmt,
-              rowStyle = function(index) {
-                if (df_details$player_id[index] %in% hl_players) {
-                  list(backgroundColor = "#ffef9dff", fontWeight = "bold") # Light yellow highlight
-                }
-              },
+            tags$div(
+              style = "margin-left: 45px; margin-top: 10px; margin-bottom: 30px;",
+              reactable(
+                df_details,
+                pagination = FALSE,
+                bordered = TRUE,
+                style = list(border = "1px solid #000000"),
+                highlight = TRUE,
+                theme = reactableTheme(headerStyle = list(display = "none")),
+                defaultSorted = list(player_team = "asc", player_name = "asc"),
+                defaultColDef = colDef(headerStyle = list(background = "#cce5ff")), # Not sure if needed
+                columns = col_fmt,
+                rowStyle = function(index) {
+                  if (df_details$player_id[index] %in% hl_players) {
+                    list(backgroundColor = "#ffef9dff", fontWeight = "bold") # Light yellow highlight
+                  }
+                },
+              )
             )
-          )
-        }
+          }
+        ),
+        c(
+          "function(el) {",
+          "  var tries = 0;",
+          "  function expandLastRow() {",
+          "    var id = el.id || el.getAttribute('data-reactable-output');",
+          "    var instance = null;",
+          "    try {",
+          "      instance = Reactable.getInstance(id);",
+          "    } catch (e) {",
+          "      instance = null;",
+          "    }",
+          "    var rows = instance && instance.rows;",
+          "    if (rows && rows.length > 0) {",
+          "      instance.toggleRowExpanded(rows[rows.length - 1].id, true);",
+          "      return;",
+          "    }",
+          "    if (++tries < 20) {",
+          "      setTimeout(expandLastRow, 50);",
+          "    }",
+          "  }",
+          "  setTimeout(expandLastRow, 0);",
+          "}"
+        )
       )
     })
   })
