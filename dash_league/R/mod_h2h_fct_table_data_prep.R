@@ -95,7 +95,10 @@ table_data_prep <- function(df_base, rv_carry_thru, df_grey_player, pin_date, po
 table_sum_data_prep <- function(df_tbl, df_base, pin_date) {
   df_sum <- df_tbl |>
     summarise(
-      across(contains("/"), \(x) sum(as.numeric(str_remove(x, "\\*")), na.rm = TRUE)),
+      across(
+        contains("/"),
+        \(x) sum(as.numeric(str_remove(x, "\\*")) * !str_detect(x, "\\*"), na.rm = TRUE)
+      ),
       .by = competitor
     ) |>
     arrange(desc(competitor)) |>
