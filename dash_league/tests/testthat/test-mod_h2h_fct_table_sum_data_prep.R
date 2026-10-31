@@ -10,21 +10,21 @@ test_that("one row per competitor, ordered descending", {
   expect_true(all(is.na(sums$player_name)))
 })
 
-test_that("daily totals include players listed Out", {
-  # as.numeric("1*") is NA, so without dropping the asterisk first Bob's games
-  # vanish from his competitor's totals - silently, apart from a coercion warning.
+test_that("daily totals exclude players listed Out", {
+  # Bob's "1*" cells are zeroed by the logical multiplier, so only Ann's games
+  # reach his competitor's totals.
   sums <- table_sum_data_prep(df_tbl, df_base, game_days[1])
   us <- filter(sums, player_team == "Us")
 
-  expect_equal(unname(unlist(select(us, contains("/")))), c(2, 1, 1, 2, 0, 0))
+  expect_equal(unname(unlist(select(us, contains("/")))), c(1, 0, 1, 1, 0, 0))
   expect_no_warning(table_sum_data_prep(df_tbl, df_base, game_days[1]))
 })
 
-test_that("games_remaining is the sum of the competitor's players", {
+test_that("games_remaining counts only available players", {
   sums <- table_sum_data_prep(df_tbl, df_base, game_days[1])
 
-  # Ann 3 + Bob 3, and Cyd 2 on her own.
-  expect_equal(pull(sums, games_remaining, player_team), c(Us = 6, Them = 2))
+  # Ann 3; Bob's 3 are excluded because he is Out. Cyd 2 on her own.
+  expect_equal(pull(sums, games_remaining, player_team), c(Us = 3, Them = 2))
 })
 
 test_that("a pin past the last game day leaves no games remaining", {

@@ -22,7 +22,10 @@ df_fty_base <-
   df_fty_base_all |>
   filter(league_id %in% target_leagues) |>
   arrange(str_to_lower(league_name), str_to_lower(competitor_name)) |>
-  mutate(across(ends_with("_id"), \(x) as.integer(x)))
+  mutate(
+    across(ends_with("_id"), \(x) as.integer(x)),
+    starter_count = as.integer(starter_count)
+  )
 
 
 # Fty categories ---------------------------------------------------------
@@ -183,6 +186,7 @@ ls_fty_lookup <- list(
   "lg_name_to_id" = as.list(deframe(distinct(df_fty_base, league_name, league_id))),
   "lg_id_to_name" = as.list(deframe(distinct(df_fty_base, league_id, league_name))),
   "lg_id_to_platform" = as.list(deframe(distinct(df_fty_base, league_id, platform))),
+  "lg_id_to_starter_count" = as.list(deframe(distinct(df_fty_base, league_id, starter_count))),
   "cp_id_to_name" = select(df_fty_base, league_id, competitor_id, competitor_name) |>
     nest_by(league_id) |>
     mutate(data = list(as.list(deframe(data)))) |>

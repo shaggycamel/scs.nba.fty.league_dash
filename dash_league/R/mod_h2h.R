@@ -25,14 +25,16 @@ mod_h2h_ui <- function(id) {
         shinycssloaders::withSpinner(reactableOutput(ns("snapshot_table")), type = 1, color = "#133DEF")
       ),
       card(
-        height = 1400,
         fill = FALSE,
         uiOutput(ns("plot_card")),
         card(
           full_screen = TRUE,
-          min_height = 200,
-          max_height = 650,
-          shinycssloaders::withSpinner(reactableOutput(ns("game_table")), type = 1, color = "#133DEF")
+          fill = FALSE,
+          bslib::card_body(
+            max_height = 650,
+            max_height_full_screen = NULL,
+            shinycssloaders::withSpinner(reactableOutput(ns("game_table")), type = 1, color = "#133DEF")
+          )
         )
       ),
       fillable = TRUE,
@@ -565,9 +567,22 @@ mod_h2h_server <- function(
       # Read off the table rather than df_base, which has no rows for the days
       # that fill_missing_days() added.
       col_dates <- col_dates_from_labels(names(df_tbl()), min(df_base()$matchup_start, na.rm = TRUE))
+      starter_count <- pluck(
+        ls_fty_lookup,
+        "lg_id_to_starter_count",
+        as.character(rv_carry_thru$league_id),
+        .default = 10
+      )
+      if (is.null(starter_count) || is.na(starter_count)) starter_count <- 10
 
-      col_fmt <- game_tbl_col_fmt(df_tbl(), input$pin_date, mup_end, col_dates)
-      col_fmt_sum <- game_tbl_col_fmt(df_tbl_sum(), input$pin_date, mup_end, col_dates, type = "sum")
+      col_fmt <- game_tbl_col_fmt(
+        df_tbl(), input$pin_date, mup_end, col_dates,
+        starter_count = starter_count
+      )
+      col_fmt_sum <- game_tbl_col_fmt(
+        df_tbl_sum(), input$pin_date, mup_end, col_dates,
+        type = "sum", starter_count = starter_count
+      )
 
       reactable(
         df_tbl_sum(),

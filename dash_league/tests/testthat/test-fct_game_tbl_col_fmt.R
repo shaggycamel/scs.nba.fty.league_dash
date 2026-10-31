@@ -61,18 +61,22 @@ test_that("a cell is flagged when the player is out", {
   expect_equal(cell_style(col_fmt, labels[2], "1*", index = 2), alert_red)
 })
 
-test_that("an ordinary game count is not flagged as a heavy day", {
-  # The heavy-day check exists for the summary row, where a competitor can field
-  # more than ten games. Comparing the player table's character cells against 10
-  # made "2" through "9" sort above "10" and turn red.
+test_that("summary cells above the league's starter count are flagged", {
   days <- cur_date + 0:2
   df_base <- fake_h2h_base(h2h_test_roster(), days)
   tbl <- table_data_prep(df_base, NULL, no_grey_players(), days[1])
   labels <- format(days, "%a (%d/%m)")
+  col_dates <- col_dates_from_labels(names(tbl), min(df_base$matchup_start))
 
-  col_fmt <- game_tbl_col_fmt(tbl, days[1], max(days), col_dates_from_labels(names(tbl), min(df_base$matchup_start)))
+  col_fmt_sum <- game_tbl_col_fmt(tbl, days[1], max(days), col_dates, type = "sum", starter_count = 10)
+  expect_null(cell_style(col_fmt_sum, labels[2], 10))
+  expect_equal(cell_style(col_fmt_sum, labels[2], 11), alert_red)
 
-  expect_null(cell_style(col_fmt, labels[2], "2"))
-  expect_null(cell_style(col_fmt, labels[2], "9"))
-  expect_equal(cell_style(col_fmt, labels[2], 11), alert_red)
+  col_fmt_sum_8 <- game_tbl_col_fmt(tbl, days[1], max(days), col_dates, type = "sum", starter_count = 8)
+  expect_null(cell_style(col_fmt_sum_8, labels[2], 8))
+  expect_equal(cell_style(col_fmt_sum_8, labels[2], 9), alert_red)
+
+  col_fmt_player <- game_tbl_col_fmt(tbl, days[1], max(days), col_dates)
+  expect_null(cell_style(col_fmt_player, labels[2], "2"))
+  expect_null(cell_style(col_fmt_player, labels[2], 11))
 })
