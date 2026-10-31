@@ -234,6 +234,19 @@ dfs_fty_standings <-
       select(rank, competitor_id, competitor_name, wins, losses, ties, pct, any_of(c("points_for", "points_against")))
   }) |>
   ungroup() |>
+  left_join(
+    distinct(df_fty_base, league_id, competitor_id, division_id, division_name),
+    by = join_by(league_id, competitor_id)
+  ) |>
+  mutate(
+    division_rank = row_number(),
+    .by = c(league_id, division_id, division_name)
+  ) |>
+  select(
+    league_id, rank, division_rank, division_id, division_name,
+    competitor_id, competitor_name, wins, losses, ties, pct,
+    any_of(c("points_for", "points_against"))
+  ) |>
   nest_by(league_id) |>
   deframe()
 

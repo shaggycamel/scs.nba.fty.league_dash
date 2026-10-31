@@ -10,7 +10,13 @@ mod_league_overview_ui <- function(id) {
   ns <- NS(id)
   tagList(
     tags$head(
-      tags$style(HTML(".selectize-dropdown-content{min-width: 100%; box-sizing: border-box;}"))
+      tags$style(HTML(
+        ".selectize-dropdown-content{min-width: 100%; box-sizing: border-box;}
+         .standings-scroll{flex: 1 1 auto; min-height: 0; overflow: auto;}
+         .standings-division{margin-bottom: 0.75rem;}
+         .standings-division:not(:first-child){margin-top: 0.75rem;}
+         .standings-division-stub{position: sticky; top: 0; z-index: 2; margin: 0 2rem; padding: 0.45rem 1rem; background: lightgreen; color: #000; border: 1px solid #000000; border-radius: 6px 6px 0 0; font-weight: 700; font-size: 1rem; letter-spacing: 0.04em;}"
+      ))
     ),
     layout_sidebar(
       sidebar = sidebar(
@@ -170,46 +176,51 @@ mod_league_overview_server <- function(id, rv_carry_thru) {
     }) |>
       bindEvent(rv_carry_thru$fty_parameters_met, rv_carry_thru$league_id)
 
-    output$standings_ui <- renderUI({
-      req(rv_carry_thru$fty_parameters_met)
-      df <- df_standings()
-      if (is.null(df) || nrow(df) == 0) {
-        empty_state(season_placeholder_text(start = season_start))
+    standings_table <- function(df, show_division_rank, highlight_ids) {
+      rank_cols <- if (show_division_rank) {
+        list(
+          division_rank = colDef(name = "Div Rank", width = 90),
+          rank = colDef(name = "Overall", width = 80)
+        )
       } else {
-        reactableOutput(ns("standings_table"))
+        list(
+          rank = colDef(name = "Rank", width = 80),
+          division_rank = colDef(show = FALSE)
+        )
       }
-    })
 
-    col_fmt_standings <- list(
-      rank = colDef(name = "Rank", width = 80),
-      competitor_id = colDef(show = FALSE),
-      competitor_name = colDef(name = "Competitor"),
-      wins = colDef(name = "W", width = 55),
-      losses = colDef(name = "L", width = 55),
-      ties = colDef(name = "T", width = 55),
-      pct = colDef(name = "PCT", format = colFormat(percent = TRUE, digits = 1)),
-      points_for = colDef(name = "PF", format = colFormat(digits = 1)),
-      points_against = colDef(name = "PA", format = colFormat(digits = 1))
-    )
+      columns <- c(
+        rank_cols,
+        list(
+          division_id = colDef(show = FALSE),
+          division_name = colDef(show = FALSE),
+          competitor_id = colDef(show = FALSE),
+          competitor_name = colDef(name = "Competitor"),
+          wins = colDef(name = "W", width = 55),
+          losses = colDef(name = "L", width = 55),
+          ties = colDef(name = "T", width = 55),
+          pct = colDef(name = "PCT", format = colFormat(percent = TRUE, digits = 1)),
+          points_for = colDef(name = "PF", format = colFormat(digits = 1)),
+          points_against = colDef(name = "PA", format = colFormat(digits = 1))
+        )
+      )
 
-    output$standings_table <- renderReactable({
-      req(df_standings())
-      df <- df_standings()
+      df <- select(df, any_of(names(columns)))
 
       reactable(
         df,
-        columns = col_fmt_standings[intersect(names(col_fmt_standings), names(df))],
+        columns = columns[intersect(names(columns), names(df))],
         pagination = FALSE,
         bordered = TRUE,
-        style = list(border = "1px solid #000000", margin = "0 2rem"),
+        style = list(
+          border = "1px solid #000000",
+          borderTop = if (show_division_rank) "none" else "1px solid #000000",
+          margin = "0 2rem"
+        ),
         highlight = TRUE,
-        height = "100%",
         defaultColDef = colDef(headerStyle = list(background = "#cce5ff")),
         rowStyle = function(index) {
-          if (
-            input$fty_lg_ov_just_h2h &&
-              df$competitor_id[index] %in% c(rv_carry_thru$competitor_id, opponent()$id)
-          ) {
+          if (length(highlight_ids) > 0 && df$competitor_id[index] %in% highlight_ids) {
             list(backgroundColor = "#ffef9dff", fontWeight = "bold")
           }
         },
@@ -254,6 +265,52 @@ mod_league_overview_server <- function(id, rv_carry_thru) {
             )
           )
         }
+      )
+    }
+
+    output$standings_ui <- renderUI({
+      req(rv_carry_thru$fty_parameters_met)
+      df <- df_standings()
+      if (is.null(df) || nrow(df) == 0) {
+        return(empty_state(season_placeholder_text(start = season_start)))
+      }
+
+      highlight_ids <- if (input$fty_lg_ov_just_h2h) {
+        c(rv_carry_thru$competitor_id, opponent()$id)
+      } else {
+        numeric()
+      }
+
+      divisions <- standings_division_groups(df)
+
+      if (is.null(divisions)) {
+        return(
+          tags$div(
+            class = "standings-scroll",
+            standings_table(df, show_division_rank = FALSE, highlight_ids = highlight_ids)
+          )
+        )
+      }
+
+      tags$div(
+        class = "standings-scroll",
+        map(seq_len(nrow(divisions)), \(i) {
+          d <- divisions[i, ]
+          df_div <- df |>
+            filter(division_id == d$division_id) |>
+            arrange(division_rank)
+
+          tags$div(
+            class = "standings-division",
+            tags$div(
+              class = "standings-division-stub",
+              role = "heading",
+              `aria-level` = "3",
+              d$division_name
+            ),
+            standings_table(df_div, show_division_rank = TRUE, highlight_ids = highlight_ids)
+          )
+        })
       )
     })
 

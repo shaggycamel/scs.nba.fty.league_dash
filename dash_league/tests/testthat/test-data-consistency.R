@@ -26,6 +26,27 @@ test_that("a points league's standings reconcile with its weighted category tota
   }
 })
 
+test_that("divided standings rank competitors within each division", {
+  pkg <- as.environment("package:league")
+  skip_if_not(rlang::env_has(pkg, "dfs_fty_standings"), "package data not built")
+
+  standings_all <- pkg[["dfs_fty_standings"]]
+  divided <- keep(standings_all, \(df) {
+    all(c("division_id", "division_name", "division_rank") %in% names(df)) &&
+      any(!is.na(df$division_name))
+  })
+  skip_if(length(divided) == 0, "no divided leagues")
+
+  for (df in divided) {
+    expect_false(any(is.na(df$division_name)))
+    expect_equal(sort(df$rank), seq_len(nrow(df)))
+
+    for (ranks in split(df$division_rank, df$division_id)) {
+      expect_equal(sort(ranks), seq_along(ranks))
+    }
+  }
+})
+
 test_that("player comparison has one row per player", {
   pkg <- as.environment("package:league")
   skip_if_not(rlang::env_has(pkg, "dfs_player_comparison"), "package data not built")
