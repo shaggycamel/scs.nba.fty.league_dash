@@ -32,7 +32,7 @@ mod_player_comparison_ui <- function(id) {
           options = list(maxItems = 5, onInitialize = I('function() { this.setValue(""); }'))
         ),
         radioButtons(ns("window"), "Rolling days", c(7, 15, 30), inline = TRUE),
-        sliderInput(ns("minute_filter"), "Minute Filter", min = 0, max = 50, value = 20, round = TRUE),
+        sliderInput(ns("minute_filter"), "Minute Filter", min = 0, max = 50, value = 10, round = TRUE),
         switchInput(
           ns("log_inj_toggle"),
           value = TRUE,
@@ -82,6 +82,14 @@ mod_player_comparison_server <- function(id, rv_carry_thru, rv_copy_teams) {
       intersect(requested, comparison_columns())
     })
 
+    cat_weights_pc <- reactive({
+      req(rv_carry_thru$fty_parameters_met)
+      df_fty_cat_weights |>
+        filter(league_id == as.integer(rv_carry_thru$league_id))
+    })
+
+    is_points_league <- reactive(any(!is.na(cat_weights_pc()$points)))
+
     # Widget operation -------------------------------------------------------
 
     # On load...
@@ -91,7 +99,7 @@ mod_player_comparison_server <- function(id, rv_carry_thru, rv_copy_teams) {
       updateSwitchInput(session, "team_player_switch", value = TRUE)
       updateSelectInput(session, "team_player_names", selected = NULL, choices = ls_nba_teams)
       updateRadioButtons(session, "window", selected = 7)
-      updateSliderInput(session, "minute_filter", value = 20)
+      updateSliderInput(session, "minute_filter", value = 10)
       updateSwitchInput(session, "log_inj_toggle", value = TRUE)
       updateSelectizeInput(
         session,
@@ -204,13 +212,17 @@ mod_player_comparison_server <- function(id, rv_carry_thru, rv_copy_teams) {
 
     output$comparison_table <- renderReactable({
       # df creation
-      df <- df_comparison() |>
+      df <- df_comparison()
+      show_fty_pts <- is_points_league() && "fty_pts" %in% names(df)
+      stat_cols <- c("min", cats())
+      if (show_fty_pts) stat_cols <- c("fty_pts", stat_cols)
+
+      df <- df |>
         select(
           team,
           player_id,
           player = player_name,
-          min,
-          all_of(cats()),
+          all_of(stat_cols),
           `Excels At`,
           `Weak At`,
           inj_status,
@@ -218,7 +230,7 @@ mod_player_comparison_server <- function(id, rv_carry_thru, rv_copy_teams) {
         )
 
       # Column formatting
-      col_fmt <- map(set_names(c("min", cats())), \(x) {
+      col_fmt <- map(set_names(stat_cols), \(x) {
         colDef(style = function(value) {
           vals <- df[[x]][is.finite(df[[x]])]
           if (value == if (x == "tov") min(vals, na.rm = TRUE) else max(vals, na.rm = TRUE)) {
@@ -226,6 +238,9 @@ mod_player_comparison_server <- function(id, rv_carry_thru, rv_copy_teams) {
           }
         })
       })
+      if (show_fty_pts) {
+        col_fmt[["fty_pts"]][["name"]] <- "FTY Pts"
+      }
       col_fmt[["xl_at_count"]] <- colDef(show = FALSE)
       col_fmt[["Weak At"]] <- colDef(style = list(fontSize = "80%", whiteSpace = "pre-line"))
       col_fmt[["Excels At"]] <- colDef(style = \(val, ix) {
@@ -281,7 +296,7 @@ mod_player_comparison_server <- function(id, rv_carry_thru, rv_copy_teams) {
           )
 
           df_log_or_inj <- if (input$log_inj_toggle) {
-            pluck(
+            df_log <- pluck(
               ls_player_game_log,
               as.character(pl_id),
               .default = tibble(
@@ -290,8 +305,17 @@ mod_player_comparison_server <- function(id, rv_carry_thru, rv_copy_teams) {
                 opponent = character(),
                 min = numeric()
               )
-            ) |>
-              select(game_date, opponent, min, any_of(cats()))
+            )
+
+            if (is_points_league()) {
+              df_log <- df_log |>
+                mutate(
+                  fty_pts = calc_fty_points(pick(any_of(cat_weights_pc()$nba_category)), cat_weights_pc())
+                )
+            }
+
+            df_log |>
+              select(game_date, opponent, any_of("fty_pts"), min, any_of(cats()))
           } else {
             pluck(ls_injuries, input$window, pl_tm, .default = tibble(!!pl_tm := "No Injuries"))
           }

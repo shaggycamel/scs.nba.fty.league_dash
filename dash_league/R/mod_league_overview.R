@@ -180,7 +180,7 @@ mod_league_overview_server <- function(id, rv_carry_thru) {
     })
 
     col_fmt_standings <- list(
-      rank = colDef(name = "Rank", width = 60),
+      rank = colDef(name = "Rank", width = 80),
       competitor_id = colDef(show = FALSE),
       competitor_name = colDef(name = "Competitor"),
       wins = colDef(name = "W", width = 55),

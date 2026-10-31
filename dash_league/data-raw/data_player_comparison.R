@@ -1,6 +1,9 @@
 # Player Comparison ------------------------------------------------------
 
 dfs_player_comparison <- map(set_names(as.character(unique(df_fty_base$league_id))), \(lg) {
+  stat_weights <- df_fty_cat_weights |>
+    filter(league_id == as.integer(lg))
+
   map(set_names(names(dfs_rolling_stats)), \(rl) {
     df_inr <- dfs_rolling_stats[[rl]] |>
       filter(season == cur_season) |>
@@ -60,6 +63,16 @@ dfs_player_comparison <- map(set_names(as.character(unique(df_fty_base$league_id
           select(player_id, min, any_of(unique(df_fty_cats$nba_category))),
         by = join_by(player_id)
       ) |>
+      (\(df) {
+        if (any(!is.na(stat_weights$points))) {
+          df |>
+            mutate(
+              fty_pts = calc_fty_points(pick(any_of(stat_weights$nba_category)), stat_weights)
+            )
+        } else {
+          df
+        }
+      })() |>
       calc_z_pcts() |>
       left_join(free_agents, by = join_by(player_id)) |>
       left_join(
