@@ -6,6 +6,7 @@
 source(here::here("data-raw", "_setup.R"))
 source(here::here("R", "utils_database.R"))
 source(here::here("R", "utils_calc_z_pcts.R"))
+source(here::here("R", "utils_calc_fty_points.R"))
 source(here::here("R", "utils_h2h.R"))
 db_con <- db_connect(Sys.getenv("NBA_DB_SECTION", "cockroach-read"))
 
