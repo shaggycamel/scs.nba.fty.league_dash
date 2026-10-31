@@ -37,8 +37,8 @@ plot_data_prep <- function(df_base, rv_carry_thru) {
         category_rows <- weighted |>
           summarise(
             label = paste0(
-              "Total - ", round(sum(points_value, na.rm = TRUE), 1), "\n\n",
-              paste(str_c(player_name, " - ", round(points_value, 1)), collapse = "\n")
+              "Total: ", round(sum(points_value, na.rm = TRUE), 1), "\n\n",
+              paste(str_c(player_name, ": ", round(points_value, 1)), collapse = "\n")
             ),
             value = sum(points_value, na.rm = TRUE),
             is_overall = FALSE,
@@ -52,8 +52,8 @@ plot_data_prep <- function(df_base, rv_carry_thru) {
           ) |>
           summarise(
             label = paste0(
-              "Total - ", round(sum(points_value, na.rm = TRUE), 1), "\n\n",
-              paste(str_c(player_name, " - ", round(points_value, 1)), collapse = "\n")
+              "Total: ", round(sum(points_value, na.rm = TRUE), 1), "\n\n",
+              paste(str_c(player_name, ": ", round(points_value, 1)), collapse = "\n")
             ),
             value = sum(points_value, na.rm = TRUE),
             is_overall = TRUE,
@@ -82,8 +82,8 @@ plot_data_prep <- function(df_base, rv_carry_thru) {
             summarise(
               #fmt: skip
               label = paste0(
-                "Total - ", round(sum(!!m_col, na.rm = TRUE), 0), "/", round(sum(!!a_col, na.rm = TRUE), 0), " (", label_percent(accuracy = 0.01)(sum(!!m_col, na.rm = TRUE)/sum(!!a_col, na.rm = TRUE)),")\n\n",
-                paste(str_c(player_name, " - ", round(!!m_col, 0), "/", round(!!a_col, 0)), collapse = "\n")
+                "Total: ", round(sum(!!m_col, na.rm = TRUE), 0), "/", round(sum(!!a_col, na.rm = TRUE), 0), " (", label_percent(accuracy = 0.01)(sum(!!m_col, na.rm = TRUE)/sum(!!a_col, na.rm = TRUE)),")\n\n",
+                paste(str_c(player_name, ": ", round(!!m_col, 0), "/", round(!!a_col, 0)), collapse = "\n")
               ),
               name = str_c(col_string, "_pct"),
               value = sum(!!m_col, na.rm = TRUE) / sum(!!a_col, na.rm = TRUE),
@@ -99,8 +99,8 @@ plot_data_prep <- function(df_base, rv_carry_thru) {
             summarise(
               # fmt: skip
               label = paste0(
-                    "Total - ", round(sum(value, na.rm = TRUE), 1), "\n\n",
-                    paste(str_c(player_name, " - ", round(value, 1)), collapse = "\n")
+                    "Total: ", round(sum(value, na.rm = TRUE), 1), "\n\n",
+                    paste(str_c(player_name, ": ", round(value, 1)), collapse = "\n")
                   ),
               value = sum(value, na.rm = TRUE),
               .by = c(competitor, name)

@@ -59,6 +59,8 @@ test_that("shooting percentages are built from made and attempted totals", {
     pull(filter(out, competitor == "Rival"), value, name)[["fg_pct"]],
     0.4
   )
+  expect_match(pull(me, label, name)[["fg_pct"]], "Total: 10/20 (50.00%)", fixed = TRUE)
+  expect_match(pull(me, label, name)[["fg_pct"]], "A: 10/20", fixed = TRUE)
 })
 
 test_that("a player listed Out contributes nothing to the totals", {
@@ -67,6 +69,7 @@ test_that("a player listed Out contributes nothing to the totals", {
   # B's 10 points and 3 assists are zeroed, leaving A's 30 and 6.
   expect_equal(pull(me, value, name)[["pts"]], 30)
   expect_equal(pull(me, value, name)[["ast"]], 6)
+  expect_match(pull(me, label, name)[["pts"]], "Total: 30", fixed = TRUE)
 })
 
 test_that("each competitor's categories are ordered with percentages last", {
@@ -84,7 +87,8 @@ test_that("points leagues start with an overall fty-points row", {
   expect_equal(pull(me, value, name)[["FTY Pts"]], 36)
   expect_true(me$is_overall[1])
   expect_false(any(me$is_overall[-1]))
-  expect_match(pull(me, label, name)[["FTY Pts"]], "Total - 36", fixed = TRUE)
+  expect_match(pull(me, label, name)[["FTY Pts"]], "Total: 36", fixed = TRUE)
+  expect_match(pull(me, label, name)[["FTY Pts"]], "A: 36", fixed = TRUE)
 })
 
 test_that("weighted category rows keep their signs", {
@@ -92,7 +96,7 @@ test_that("weighted category rows keep their signs", {
   tov <- filter(out, competitor == "Me", as.character(name) == "tov")
 
   expect_equal(tov$value, -6)
-  expect_match(tov$label, "Total - -6", fixed = TRUE)
+  expect_match(tov$label, "Total: -6", fixed = TRUE)
 })
 
 test_that("postseason plot data combines completed matchups for one competitor", {
