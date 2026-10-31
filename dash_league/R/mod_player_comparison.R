@@ -32,7 +32,7 @@ mod_player_comparison_ui <- function(id) {
           options = list(maxItems = 5, onInitialize = I('function() { this.setValue(""); }'))
         ),
         radioButtons(ns("window"), "Rolling days", c(7, 15, 30), inline = TRUE),
-        sliderInput(ns("minute_filter"), "Minute Filter", min = 0, max = 50, value = 20, round = TRUE),
+        sliderInput(ns("minute_filter"), "Minute Filter", min = 0, max = 50, value = 10, round = TRUE),
         switchInput(
           ns("log_inj_toggle"),
           value = TRUE,
@@ -99,7 +99,7 @@ mod_player_comparison_server <- function(id, rv_carry_thru, rv_copy_teams) {
       updateSwitchInput(session, "team_player_switch", value = TRUE)
       updateSelectInput(session, "team_player_names", selected = NULL, choices = ls_nba_teams)
       updateRadioButtons(session, "window", selected = 7)
-      updateSliderInput(session, "minute_filter", value = 20)
+      updateSliderInput(session, "minute_filter", value = 10)
       updateSwitchInput(session, "log_inj_toggle", value = TRUE)
       updateSelectizeInput(
         session,
