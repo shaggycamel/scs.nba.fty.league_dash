@@ -450,87 +450,40 @@ mod_h2h_server <- function(
 
     # Plot -------------------------------------------------------------------
 
+    is_points_league <- reactive({
+      req(rv_carry_thru$fty_parameters_met)
+      df_fty_cat_weights |>
+        filter(
+          league_id == as.integer(rv_carry_thru$league_id),
+          !is.na(points)
+        ) |>
+        nrow() > 0
+    })
+
     output$stat_plot <- renderD3({
       req(df_plt())
 
       r2d3(
         data = df_plt(),
-        script = app_sys("d3/h2h_stat_plot/h2h_stat_plot.js")
+        script = app_sys("d3/h2h_stat_plot/h2h_stat_plot.js"),
+        options = list(
+          expanded = isTRUE(input$h2h_plot_expanded),
+          toggle_input = ns("h2h_plot_expanded")
+        )
       )
-    })
-
-    # Points -----------------------------------------------------------------
-
-    cat_weights_h2h <- reactive({
-      req(rv_carry_thru$fty_parameters_met)
-      filter(df_fty_cat_weights, league_id == as.integer(rv_carry_thru$league_id))
-    })
-
-    is_points_league <- reactive(any(!is.na(cat_weights_h2h()$points)))
-
-    df_points <- reactive({
-      req(nrow(df_base()) > 0)
-      points_data_prep(df_base(), cat_weights_h2h())
     })
 
     output$plot_card <- renderUI({
       req(rv_carry_thru$fty_parameters_met)
+      # Read the toggle state in isolation: the D3 click animates this card's
+      # height itself, and re-rendering the card here would replace it mid-flight.
+      collapsed <- is_points_league() && !isTRUE(isolate(input$h2h_plot_expanded))
 
-      plot_panel <- nav_panel(
-        "Category Share",
+      card(
+        full_screen = TRUE,
+        class = "h2h-plot-card",
+        height = if (collapsed) 200 else 700,
         shinycssloaders::withSpinner(d3Output(ns("stat_plot"), height = "100%"), type = 1, color = "#133DEF")
-      )
-
-      if (is_points_league()) {
-        navset_card_tab(
-          full_screen = TRUE,
-          height = 700,
-          nav_panel(
-            "Projected Points",
-            shinycssloaders::withSpinner(reactableOutput(ns("points_table")), type = 1, color = "#133DEF")
-          ),
-          plot_panel
-        )
-      } else {
-        card(
-          full_screen = TRUE,
-          height = 700,
-          shinycssloaders::withSpinner(d3Output(ns("stat_plot"), height = "100%"), type = 1, color = "#133DEF")
-        )
-      }
-    })
-
-    output$points_table <- renderReactable({
-      req(df_points())
-
-      df_wide <- df_points() |>
-        select(competitor, fmt_category, points) |>
-        pivot_wider(names_from = competitor, values_from = points)
-
-      competitor_cols <- setdiff(names(df_wide), "fmt_category")
-
-      columns <- c(
-        list(fmt_category = colDef(name = "Category", footer = "Projected", footerStyle = list(fontWeight = "bold"))),
-        map(set_names(competitor_cols), \(nm) {
-          colDef(
-            name = nm,
-            footer = \(values) round(sum(values, na.rm = TRUE), 1),
-            footerStyle = list(fontWeight = "bold"),
-            cell = \(value) if (is.na(value)) "" else format(round(value, 1), nsmall = 0, big.mark = ","),
-            style = \(value, index) if (!is.na(value) && value < 0) list(color = "#c0392b") else NULL
-          )
-        })
-      )
-
-      reactable(
-        df_wide,
-        columns = columns,
-        pagination = FALSE,
-        bordered = TRUE,
-        style = list(border = "1px solid #000000", margin = "0 2rem"),
-        highlight = TRUE,
-        height = "100%",
-        defaultColDef = colDef(headerStyle = list(background = "#cce5ff"))
       )
     })
 

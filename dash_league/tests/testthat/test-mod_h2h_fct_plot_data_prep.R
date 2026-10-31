@@ -13,7 +13,8 @@ plot_fixture <- function() {
     ftm = c(5, 2, 1),
     fta = c(10, 4, 2),
     pts = c(30, 10, 7),
-    ast = c(6, 3, 1)
+    ast = c(6, 3, 1),
+    tov = c(3, 1, 2)
   )
 }
 
@@ -24,6 +25,28 @@ plot_categories <- function() {
 plot_prep <- function(df, league_id = 1) {
   local_pkg_data(ls_lo_lg_cats = plot_categories())
   plot_data_prep(df, list(league_id = league_id))
+}
+
+points_categories <- function() {
+  list("1" = list(Categories = c("pts" = "pts", "ast" = "ast", "tov" = "tov")))
+}
+
+points_weights <- function() {
+  tibble(
+    league_id = 1L,
+    nba_category = c("pts", "ast", "tov"),
+    fmt_category = c("Points", "Assists", "Turnovers"),
+    display_order = c(3, 7, 11),
+    points = c(1, 2, -2)
+  )
+}
+
+points_prep <- function(df) {
+  local_pkg_data(
+    ls_lo_lg_cats = points_categories(),
+    df_fty_cat_weights = points_weights()
+  )
+  plot_data_prep(df, list(league_id = 1))
 }
 
 test_that("shooting percentages are built from made and attempted totals", {
@@ -51,6 +74,25 @@ test_that("each competitor's categories are ordered with percentages last", {
 
   expect_equal(as.character(filter(out, competitor == "Me")$name), c("ast", "pts", "fg_pct", "ft_pct"))
   expect_equal(as.character(filter(out, competitor == "Rival")$name), c("ast", "pts", "fg_pct", "ft_pct"))
+})
+
+test_that("points leagues start with an overall fty-points row", {
+  out <- points_prep(plot_fixture())
+  me <- filter(out, competitor == "Me")
+
+  expect_equal(as.character(me$name), c("FTY Pts", "pts", "ast", "tov"))
+  expect_equal(pull(me, value, name)[["FTY Pts"]], 36)
+  expect_true(me$is_overall[1])
+  expect_false(any(me$is_overall[-1]))
+  expect_match(pull(me, label, name)[["FTY Pts"]], "Total - 36", fixed = TRUE)
+})
+
+test_that("weighted category rows keep their signs", {
+  out <- points_prep(plot_fixture())
+  tov <- filter(out, competitor == "Me", as.character(name) == "tov")
+
+  expect_equal(tov$value, -6)
+  expect_match(tov$label, "Total - -6", fixed = TRUE)
 })
 
 test_that("postseason plot data combines completed matchups for one competitor", {
