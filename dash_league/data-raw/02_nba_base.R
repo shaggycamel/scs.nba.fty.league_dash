@@ -223,7 +223,7 @@ ls_injuries <-
 
 ls_player_game_log <-
   df_nba_player_box_score |>
-  filter(between(game_date, max(game_date) - ddays(30), max(game_date) - ddays(1))) |>
+  filter(game_date < cur_date, game_date >= cur_date - ddays(30)) |>
   select(player_id, game_date, opponent, any_of(player_stat_cols)) |>
   arrange(desc(game_date)) |>
   nest_by(player_id) |>

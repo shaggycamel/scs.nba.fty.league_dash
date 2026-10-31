@@ -59,6 +59,21 @@ test_that("player comparison includes every scored league category", {
   }
 })
 
+test_that("player game logs only contain completed games from the last 30 days", {
+  pkg <- as.environment("package:league")
+  needed <- c("ls_player_game_log", "cur_date")
+  skip_if_not(all(rlang::env_has(pkg, needed)), "package data not built")
+
+  game_dates <- pkg[["ls_player_game_log"]] |>
+    purrr::map(\(df) df$game_date) |>
+    unlist()
+
+  skip_if(length(game_dates) == 0, "no games in the log window")
+
+  expect_true(all(game_dates < pkg[["cur_date"]]))
+  expect_true(all(game_dates >= pkg[["cur_date"]] - 30))
+})
+
 test_that("every built league has free-agent future games", {
   pkg <- as.environment("package:league")
   skip_if_not(rlang::env_has(pkg, "dfs_h2h_future"), "package data not built")
