@@ -60,6 +60,11 @@ app_ui <- function(request) {
              if (b && !b.disabled) b.click();
            }
          });"
+      )),
+      tags$script(HTML(
+        "setInterval(function () {
+           fetch('www/keepalive.txt?ts=' + Date.now(), { cache: 'no-store' }).catch(function () {});
+         }, 60000);"
       ))
     ),
     uiOutput("app")
