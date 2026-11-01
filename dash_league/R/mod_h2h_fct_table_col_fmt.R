@@ -113,10 +113,12 @@ game_tbl_col_fmt <- function(df, dt, mup_end, col_dates, type = "player", starte
       align = "center",
       header = tags$span(nm[1], tags$br(), nm[2]),
       style = function(value, index) {
+        intervals <- if ("grey_intervals" %in% names(df)) df$grey_intervals[[index]] else NULL
         if (
           type == "player" &&
-            (col_date < coalesce(df$min_grey_date[index], as.Date("1000-01-01")) |
-              col_date > coalesce(df$max_grey_date[index], as.Date("3000-01-01")))
+            !is.null(intervals) &&
+            nrow(intervals) > 0 &&
+            any(col_date >= intervals$start & col_date <= intervals$end)
         ) {
           list(background = "#d7d7d5", color = "#d7d7d5")
         } else if (
@@ -138,10 +140,11 @@ game_tbl_col_fmt <- function(df, dt, mup_end, col_dates, type = "player", starte
     header = tags$span("Games", tags$br(), "Remaining"),
     style = list(background = "#96e5cbeb")
   )
-  col_fmt[["min_grey_date"]] <- colDef(show = FALSE)
-  col_fmt[["max_grey_date"]] <- colDef(show = FALSE)
-  col_fmt[["competitor"]] <- colDef(show = FALSE)
-  col_fmt[["player_id"]] <- colDef(show = FALSE)
+  for (nm in c("grey_intervals", "competitor_id", "competitor", "player_id")) {
+    if (nm %in% names(df)) {
+      col_fmt[[nm]] <- colDef(show = FALSE)
+    }
+  }
   col_fmt[["player_name"]] <- colDef(
     show = ifelse(type == "sum", FALSE, TRUE),
     name = "",

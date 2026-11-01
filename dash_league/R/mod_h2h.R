@@ -543,10 +543,6 @@ mod_h2h_server <- function(
       )
       if (is.null(starter_count) || is.na(starter_count)) starter_count <- 10
 
-      col_fmt <- game_tbl_col_fmt(
-        df_tbl(), input$pin_date, mup_end, col_dates,
-        starter_count = starter_count
-      )
       col_fmt_sum <- game_tbl_col_fmt(
         df_tbl_sum(), input$pin_date, mup_end, col_dates,
         type = "sum", starter_count = starter_count
@@ -566,6 +562,10 @@ mod_h2h_server <- function(
           columns = col_fmt_sum,
           details = \(ix) {
             df_details <- filter(df_tbl(), competitor == df_tbl_sum()$player_team[ix])
+            col_fmt <- game_tbl_col_fmt(
+              df_details, input$pin_date, mup_end, col_dates,
+              starter_count = starter_count
+            )
 
             tags$div(
               style = "margin-left: 45px; margin-top: 10px; margin-bottom: 30px;",

@@ -44,6 +44,7 @@ fake_h2h_base <- function(players, days, matchup_end = max(days), matchup_end_pl
     map(\(p) {
       tibble(
         competitor = p$competitor,
+        competitor_id = match(p$competitor, c("Us", "Them")),
         player_team = p$team,
         player_id = p$id,
         player_name = p$name,
@@ -61,13 +62,13 @@ fake_h2h_base <- function(players, days, matchup_end = max(days), matchup_end_pl
     list_rbind()
 }
 
-# table_data_prep() left-joins the grey-player frame on player_id. An empty one
-# means nobody was added to or dropped from a roster mid-matchup.
+# table_data_prep() left-joins the grey-player frame on player_id and
+# competitor_id. An empty one means nobody was added to or dropped mid-matchup.
 no_grey_players <- function() {
   tibble(
-    player_id = numeric(),
-    min_grey_date = as.Date(character()),
-    max_grey_date = as.Date(character())
+    player_id = integer(),
+    competitor_id = integer(),
+    grey_intervals = list()
   )
 }
 

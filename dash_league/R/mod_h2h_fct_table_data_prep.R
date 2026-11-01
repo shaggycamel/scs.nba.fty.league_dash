@@ -1,48 +1,79 @@
+grey_intervals_from_stints <- function(start, end, matchup_start, latest_assigned_date) {
+  still_rostered <- isTRUE(max(end, na.rm = TRUE) == latest_assigned_date)
+
+  grey_start <- c(matchup_start, end + 1)
+  grey_end <- c(start - 1, if (still_rostered) as.Date(NA) else as.Date("3000-01-01"))
+
+  tibble(start = grey_start, end = grey_end) |>
+    filter(!is.na(start), !is.na(end), start <= end)
+}
+
+
 grey_player_data_prep <- function(input, df_base, rv_carry_thru, opponent) {
-  # past roster
-  df_base |>
-    filter(tense == "past") |>
-    summarise(
-      min_grey_date = min(game_date),
-      max_grey_date = max(game_date),
-      .by = player_id
-    ) |>
-    inner_join(
-      # Current Roster
-      pluck(dfs_fty_roster, as.character(rv_carry_thru$league_id)) |>
-        filter(
-          competitor_id %in% c(rv_carry_thru$competitor_id, opponent()$id),
-          matchup_period == as.integer(input$matchup)
-        ) |>
-        mutate(max_assigned_date = max(assigned_date)) |>
-        filter(
-          min(assigned_date) != matchup_start |
-            max(assigned_date) != max_assigned_date,
-          .by = player_id
-        ) |>
-        distinct(player_id, matchup_start, max_assigned_date),
-      by = join_by(player_id)
-    ) |>
+  roster <- pluck(dfs_fty_roster, as.character(rv_carry_thru$league_id)) |>
+    filter(
+      competitor_id %in% c(rv_carry_thru$competitor_id, opponent()$id),
+      matchup_period == as.integer(input$matchup),
+      assigned_date >= matchup_start,
+      assigned_date <= matchup_end
+    )
+
+  if (nrow(roster) == 0) {
+    return(tibble(
+      competitor_id = integer(),
+      player_id = integer(),
+      grey_intervals = list()
+    ))
+  }
+
+  observed <- roster |>
+    distinct(competitor_id, assigned_date) |>
+    arrange(competitor_id, assigned_date) |>
+    mutate(snapshot = seq_along(assigned_date), .by = competitor_id)
+
+  latest <- observed |>
+    summarise(latest_assigned_date = max(assigned_date), .by = competitor_id)
+
+  roster |>
+    distinct(competitor_id, player_id, assigned_date, matchup_start) |>
+    inner_join(observed, by = join_by(competitor_id, assigned_date)) |>
+    arrange(competitor_id, player_id, snapshot) |>
     mutate(
-      min_grey_date = if_else(
-        min_grey_date == matchup_start,
-        NA_Date_,
-        min_grey_date
-      ),
-      max_grey_date = if_else(
-        between(max_grey_date, max_assigned_date - 1, max_assigned_date),
-        NA_Date_,
-        max_grey_date
-      )
+      new_stint = c(TRUE, diff(snapshot) > 1),
+      .by = c(competitor_id, player_id)
     ) |>
-    select(-c(matchup_start, max_assigned_date))
+    mutate(stint = cumsum(new_stint), .by = c(competitor_id, player_id)) |>
+    summarise(
+      start = min(assigned_date),
+      end = max(assigned_date),
+      matchup_start = min(matchup_start, na.rm = TRUE),
+      .by = c(competitor_id, player_id, stint)
+    ) |>
+    left_join(latest, by = join_by(competitor_id)) |>
+    arrange(competitor_id, player_id, start) |>
+    summarise(
+      grey_intervals = list(
+        grey_intervals_from_stints(
+          start,
+          end,
+          matchup_start[1],
+          latest_assigned_date[1]
+        )
+      ),
+      .by = c(competitor_id, player_id)
+    ) |>
+    filter(map_int(grey_intervals, nrow) > 0) |>
+    inner_join(
+      distinct(df_base, competitor_id, player_id),
+      by = join_by(competitor_id, player_id)
+    )
 }
 
 
 table_data_prep <- function(df_base, rv_carry_thru, df_grey_player, pin_date, post_matchup_days = 2) {
   df_wide <- df_base |>
     arrange(game_date) |>
-    select(competitor, player_team, player_id, player_name, inj_status, fmt_date, scheduled_to_play) |>
+    select(competitor, competitor_id, player_team, player_id, player_name, inj_status, fmt_date, scheduled_to_play) |>
     distinct() |>
     mutate(
       scheduled_to_play = as.character(replace_na(scheduled_to_play, 0)),
@@ -89,7 +120,7 @@ table_data_prep <- function(df_base, rv_carry_thru, df_grey_player, pin_date, po
       .before = if (all(is.na(df_base$matchup_end_plus))) last_col() else last_col(2)
     ) |>
     ungroup() |>
-    left_join(df_grey_player, by = join_by(player_id))
+    left_join(df_grey_player, by = join_by(player_id, competitor_id))
 }
 
 table_sum_data_prep <- function(df_tbl, df_base, pin_date) {
@@ -121,7 +152,7 @@ table_sum_data_prep <- function(df_tbl, df_base, pin_date) {
       .before = if (all(is.na(df_base$matchup_end_plus))) last_col() else last_col(2)
     ) |>
     ungroup() |>
-    mutate(min_grey_date = NA_Date_, max_grey_date = NA_Date_)
+    mutate(grey_intervals = vector("list", length(player_team)))
 }
 
 
