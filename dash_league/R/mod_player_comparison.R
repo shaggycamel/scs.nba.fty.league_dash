@@ -32,14 +32,7 @@ mod_player_comparison_ui <- function(id) {
           options = list(maxItems = 5, onInitialize = I('function() { this.setValue(""); }'))
         ),
         radioButtons(ns("window"), "Rolling days", c(7, 15, 30), inline = TRUE),
-        sliderInput(ns("minute_filter"), "Minute Filter", min = 0, max = 50, value = 10, round = TRUE),
-        switchInput(
-          ns("log_inj_toggle"),
-          value = TRUE,
-          onLabel = "Log",
-          offLabel = "Inj",
-          size = "small"
-        )
+        sliderInput(ns("minute_filter"), "Minute Filter", min = 0, max = 50, value = 10, round = TRUE)
       ),
       card(full_screen = TRUE, shinycssloaders::withSpinner(reactableOutput(ns("comparison_table")), type = 1, color = "#133DEF")),
       fillable = TRUE
@@ -100,7 +93,6 @@ mod_player_comparison_server <- function(id, rv_carry_thru, rv_copy_teams) {
       updateSelectInput(session, "team_player_names", selected = NULL, choices = ls_nba_teams)
       updateRadioButtons(session, "window", selected = 7)
       updateSliderInput(session, "minute_filter", value = 10)
-      updateSwitchInput(session, "log_inj_toggle", value = TRUE)
       updateSelectizeInput(
         session,
         "excels_at_filter",
@@ -286,60 +278,15 @@ mod_player_comparison_server <- function(id, rv_carry_thru, rv_copy_teams) {
         columns = col_fmt,
         onClick = "expand",
         details = \(ix) {
-          pl_tm <- if (input$log_inj_toggle) df$player[ix] else df$team[ix]
-          pl_id <- df$player_id[ix]
-          pl_or_tm_hf_header <- paste(if (input$log_inj_toggle) "Player" else "Team", "not found...")
-          log_or_inj_header <- str_c(
-            pl_tm,
-            if (input$log_inj_toggle) "Game Log" else paste("Last", input$window, "Day Injury History"),
-            sep = " "
+          comparison_details_tabs(
+            player_name = df$player[ix],
+            team = df$team[ix],
+            player_id = df$player_id[ix],
+            window = input$window,
+            cats = cats(),
+            cat_weights = cat_weights_pc(),
+            is_points_league = is_points_league()
           )
-
-          df_log_or_inj <- if (input$log_inj_toggle) {
-            df_log <- pluck(
-              ls_player_game_log,
-              as.character(pl_id),
-              .default = tibble(
-                !!pl_tm := "No Games",
-                game_date = as.Date(character()),
-                opponent = character(),
-                min = numeric()
-              )
-            )
-
-            if (is_points_league()) {
-              df_log <- df_log |>
-                mutate(
-                  fty_pts = calc_fty_points(pick(any_of(cat_weights_pc()$nba_category)), cat_weights_pc())
-                )
-            }
-
-            df_log |>
-              select(game_date, opponent, any_of("fty_pts"), min, any_of(cats()))
-          } else {
-            pluck(ls_injuries, input$window, pl_tm, .default = tibble(!!pl_tm := "No Injuries"))
-          }
-
-          if (is.na(pl_tm)) {
-            tags$div(tags$h2(class = "title", pl_or_tm_hf_header))
-          } else {
-            tags$div(
-              style = "margin-left: 45px; margin-top: 10px; margin-bottom: 30px;",
-              tags$h2(class = "title", log_or_inj_header),
-              reactable(
-                df_log_or_inj,
-                pagination = TRUE,
-                defaultPageSize = 5,
-                fullWidth = FALSE,
-                defaultColDef = colDef(
-                  align = "left",
-                  minWidth = 120,
-                  headerStyle = list(background = "#cce5ff"),
-                ),
-                columns = list(player_names = colDef(minWidth = 1000))
-              )
-            )
-          }
         }
       )
     })
