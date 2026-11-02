@@ -31,7 +31,7 @@ plot_data_prep <- function(df_base, rv_carry_thru) {
       value = sum(value, na.rm = TRUE),
       .by = c(competitor, player_id, player_name, name)
     ) |>
-    arrange(desc(value)) |>
+    arrange(desc(value), player_name) |>
     (\(x) {
       if (nrow(stat_weights) > 0) {
         weighted <- x |>
@@ -39,7 +39,8 @@ plot_data_prep <- function(df_base, rv_carry_thru) {
             stat_weights |> select(nba_category, points),
             by = join_by(name == nba_category)
           ) |>
-          mutate(points_value = value * points)
+          mutate(points_value = value * points) |>
+          arrange(desc(points_value), player_name)
 
         category_rows <- weighted |>
           summarise(
@@ -57,6 +58,7 @@ plot_data_prep <- function(df_base, rv_carry_thru) {
             points_value = sum(points_value, na.rm = TRUE),
             .by = c(competitor, player_id, player_name)
           ) |>
+          arrange(desc(points_value), player_name) |>
           summarise(
             label = paste0(
               "Total: ", round(sum(points_value, na.rm = TRUE), 1), "\n\n",
@@ -86,6 +88,8 @@ plot_data_prep <- function(df_base, rv_carry_thru) {
           x |>
             filter(str_detect(name, col_string)) |>
             pivot_wider(names_from = name, values_from = value) |>
+            mutate(pct = !!m_col / !!a_col) |>
+            arrange(desc(!!m_col), desc(pct), player_name) |>
             summarise(
               #fmt: skip
               label = paste0(

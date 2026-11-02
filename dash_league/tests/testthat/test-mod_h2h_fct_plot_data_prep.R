@@ -52,6 +52,56 @@ points_prep <- function(df) {
   plot_data_prep(df, list(league_id = 1))
 }
 
+category_weights <- function() {
+  tibble(
+    league_id = 1L,
+    nba_category = c("pts", "ast", "tov"),
+    fmt_category = c("Points", "Assists", "Turnovers"),
+    display_order = c(3, 7, 11),
+    points = NA_real_,
+    higher_is_better = c(TRUE, TRUE, FALSE)
+  )
+}
+
+category_prep <- function(df) {
+  local_pkg_data(
+    ls_lo_lg_cats = plot_categories(),
+    df_fty_cat_weights = category_weights()
+  )
+  plot_data_prep(df, list(league_id = 1))
+}
+
+# A roster sized so a tooltip's line order can't be confused with the row order
+# of the long frame: totals, single-category highs, makes and percentages all
+# disagree, and Bob/Dee (and the no-shot players) tie to exercise the tie-break.
+order_fixture <- function() {
+  tibble(
+    competitor = "Me",
+    player_id = 1:5,
+    player_name = c("Ann", "Bob", "Cyd", "Dee", "Eve"),
+    inj_status = NA_character_,
+    game_date = as.Date("2026-01-02"),
+    matchup_start = as.Date("2025-12-29"),
+    matchup_end = as.Date("2026-01-04"),
+    fgm = c(10, 5, 5, 0, 0),
+    fga = c(20, 20, 10, 1, 0),
+    ftm = c(5, 2, 0, 0, 0),
+    fta = c(10, 4, 0, 0, 0),
+    pts = c(40, 12, 1, 12, 0),
+    ast = c(0, 20, 0, 3, 0),
+    tov = c(0, 1, 9, 2, 0)
+  )
+}
+
+# The player lines of one tooltip, in the order the tooltip shows them.
+tooltip_lines <- function(out, competitor, nm) {
+  out |>
+    filter(competitor == .env$competitor, as.character(name) == .env$nm) |>
+    pull(label) |>
+    str_split_1("\n") |>
+    discard(\(x) !nzchar(x) || startsWith(x, "Total: "))
+}
+
 test_that("shooting percentages are built from made and attempted totals", {
   out <- plot_prep(plot_fixture())
   me <- filter(out, competitor == "Me")
@@ -135,6 +185,50 @@ test_that("weighted category rows keep their signs", {
 
   expect_equal(tov$value, -6)
   expect_match(tov$label, "Total: -6", fixed = TRUE)
+})
+
+test_that("the overall tooltip lists players in descending points", {
+  out <- points_prep(order_fixture())
+
+  expect_equal(
+    tooltip_lines(out, "Me", "FTY Pts"),
+    c("Bob: 50", "Ann: 40", "Dee: 14", "Eve: 0", "Cyd: -17")
+  )
+})
+
+test_that("category tooltips in a points league descend by weighted points", {
+  out <- points_prep(order_fixture())
+
+  expect_equal(
+    tooltip_lines(out, "Me", "pts"),
+    c("Ann: 40", "Bob: 12", "Dee: 12", "Cyd: 1", "Eve: 0")
+  )
+  expect_equal(
+    tooltip_lines(out, "Me", "tov"),
+    c("Ann: 0", "Eve: 0", "Bob: -2", "Dee: -4", "Cyd: -18")
+  )
+})
+
+test_that("category tooltips in a category league descend by the stat", {
+  out <- category_prep(order_fixture())
+
+  expect_equal(
+    tooltip_lines(out, "Me", "pts"),
+    c("Ann: 40", "Bob: 12", "Dee: 12", "Cyd: 1", "Eve: 0")
+  )
+})
+
+test_that("shooting tooltips lead with the most makes, then the best rate", {
+  out <- category_prep(order_fixture())
+
+  expect_equal(
+    tooltip_lines(out, "Me", "fg_pct"),
+    c("Ann: 10/20", "Cyd: 5/10", "Bob: 5/20", "Dee: 0/1", "Eve: 0/0")
+  )
+  expect_equal(
+    tooltip_lines(out, "Me", "ft_pct"),
+    c("Ann: 5/10", "Bob: 2/4", "Cyd: 0/0", "Dee: 0/0", "Eve: 0/0")
+  )
 })
 
 test_that("post-matchup games are excluded from FTY points", {
