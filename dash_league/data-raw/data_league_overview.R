@@ -229,8 +229,9 @@ dfs_fty_standings <-
 
     df_standings |>
       mutate(pct = (wins + 0.5 * ties) / (wins + losses + ties)) |>
-      arrange(desc(wins), losses, desc(pct)) |>
+      arrange(desc(wins), losses, desc(pct), str_to_lower(competitor_name)) |>
       mutate(rank = row_number()) |>
+      mutate(rank = min(rank), .by = c(wins, losses, pct)) |>
       select(rank, competitor_id, competitor_name, wins, losses, ties, pct, any_of(c("points_for", "points_against")))
   }) |>
   ungroup() |>
@@ -241,6 +242,10 @@ dfs_fty_standings <-
   mutate(
     division_rank = row_number(),
     .by = c(league_id, division_id, division_name)
+  ) |>
+  mutate(
+    division_rank = min(division_rank),
+    .by = c(league_id, division_id, division_name, wins, losses, pct)
   ) |>
   select(
     league_id, rank, division_rank, division_id, division_name,

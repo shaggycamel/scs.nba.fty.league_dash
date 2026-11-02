@@ -26,6 +26,34 @@ test_that("a points league's standings reconcile with its weighted category tota
   }
 })
 
+# SQL RANK() over the standings sort key (wins desc, losses asc, pct desc):
+# a competitor's rank is 1 + the number of strictly better records, so tied
+# records share a rank and the next rank skips the tie block.
+expected_standings_rank <- function(df) {
+  map_int(seq_len(nrow(df)), \(i) {
+    better <- with(
+      df,
+      wins > wins[i] |
+        (wins == wins[i] & losses < losses[i]) |
+        (wins == wins[i] & losses == losses[i] & pct > pct[i])
+    )
+    sum(better %in% TRUE) + 1L
+  })
+}
+
+test_that("standings rank competitors with SQL RANK semantics", {
+  pkg <- as.environment("package:league")
+  skip_if_not(rlang::env_has(pkg, "dfs_fty_standings"), "package data not built")
+
+  for (df in pkg[["dfs_fty_standings"]]) {
+    expect_equal(df$rank, expected_standings_rank(df))
+
+    for (div in split(df, df$division_id)) {
+      expect_equal(div$division_rank, expected_standings_rank(div))
+    }
+  }
+})
+
 test_that("divided standings rank competitors within each division", {
   pkg <- as.environment("package:league")
   skip_if_not(rlang::env_has(pkg, "dfs_fty_standings"), "package data not built")
@@ -39,10 +67,12 @@ test_that("divided standings rank competitors within each division", {
 
   for (df in divided) {
     expect_false(any(is.na(df$division_name)))
-    expect_equal(sort(df$rank), seq_len(nrow(df)))
+    expect_equal(min(df$rank), 1L)
+    expect_true(max(df$rank) <= nrow(df))
 
     for (ranks in split(df$division_rank, df$division_id)) {
-      expect_equal(sort(ranks), seq_along(ranks))
+      expect_equal(min(ranks), 1L)
+      expect_true(max(ranks) <= length(ranks))
     }
   }
 })
