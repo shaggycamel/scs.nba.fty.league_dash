@@ -26,7 +26,9 @@ grey_fixtures <- function() {
       start + 2,
       start
     )),
-    tense = "past"
+    tense = "past",
+    matchup_start = start,
+    matchup_end = cur_date + 3
   )
 
   roster <- tibble(
@@ -80,12 +82,20 @@ grey_fixtures <- function() {
   list(df_base = df_base, roster = roster)
 }
 
-grey_prep <- function(input, df_base, rv_carry_thru, opponent) {
+grey_prep <- function(input, df_base, rv_carry_thru, opponent, rv_alter_team = list()) {
   local_pkg_data(dfs_fty_roster = list("1" = grey_fixtures()$roster))
-  grey_player_data_prep(input, df_base, rv_carry_thru, opponent)
+  grey_player_data_prep(input, df_base, rv_carry_thru, opponent, rv_alter_team)
 }
 
 grey_opponent <- function() list(id = 2L, name = "Rival")
+
+grey_rv <- function(cur_matchup_period = 5L) {
+  list(
+    league_id = 1,
+    competitor_id = 1,
+    cur_matchup_period = cur_matchup_period
+  )
+}
 
 grey_intervals <- function(out, player_id, competitor_id = 1L) {
   out |>
@@ -220,4 +230,170 @@ test_that("a matchup with no roster history has no grey intervals", {
 
   expect_named(out, c("competitor_id", "player_id", "grey_intervals"))
   expect_equal(nrow(out), 0)
+})
+
+test_that("an alter-team exclusion greys from the action date to the end", {
+  ex <- list(list(
+    action = "ex",
+    player_id = 12L,
+    action_date = as.character(cur_date)
+  ))
+  out <- grey_prep(
+    list(matchup = 5L),
+    grey_fixtures()$df_base,
+    grey_rv(),
+    grey_opponent,
+    ex
+  )
+
+  expect_equal(
+    grey_intervals(out, 12L),
+    tibble(start = cur_date, end = as.Date("3000-01-01"))
+  )
+})
+
+test_that("an exclusion greys on after the action date even with no games left", {
+  ex <- list(list(
+    action = "ex",
+    player_id = 12L,
+    action_date = as.character(cur_date + 3)
+  ))
+  out <- grey_prep(
+    list(matchup = 5L),
+    grey_fixtures()$df_base,
+    grey_rv(),
+    grey_opponent,
+    ex
+  )
+
+  expect_equal(
+    grey_intervals(out, 12L),
+    tibble(start = cur_date + 3, end = as.Date("3000-01-01"))
+  )
+})
+
+test_that("an exclusion from an earlier matchup starts at the later matchup", {
+  later <- grey_fixtures()$df_base |>
+    mutate(
+      matchup_start = cur_date + 7,
+      matchup_end = cur_date + 13
+    )
+  ex <- list(list(
+    action = "ex",
+    player_id = 12L,
+    action_date = as.character(cur_date)
+  ))
+  out <- grey_prep(
+    list(matchup = 6L),
+    later,
+    grey_rv(),
+    grey_opponent,
+    ex
+  )
+
+  expect_equal(
+    grey_intervals(out, 12L),
+    tibble(start = cur_date + 7, end = as.Date("3000-01-01"))
+  )
+})
+
+test_that("an alter exclusion combines with the player's roster intervals", {
+  ex <- list(list(
+    action = "ex",
+    player_id = 11L,
+    action_date = as.character(cur_date)
+  ))
+  out <- grey_prep(
+    list(matchup = 5L),
+    grey_fixtures()$df_base,
+    grey_rv(),
+    grey_opponent,
+    ex
+  )
+
+  expect_equal(
+    grey_intervals(out, 11L),
+    tibble(
+      start = c(cur_date - 3, cur_date),
+      end = c(cur_date - 2, as.Date("3000-01-01"))
+    )
+  )
+})
+
+test_that("an add wins over an exclusion for the same player", {
+  moves <- list(
+    list(
+      action = "ex",
+      player_id = 12L,
+      action_date = as.character(cur_date)
+    ),
+    list(
+      action = "add",
+      player_id = 12L,
+      action_date = as.character(cur_date)
+    )
+  )
+  out <- grey_prep(
+    list(matchup = 5L),
+    grey_fixtures()$df_base,
+    grey_rv(),
+    grey_opponent,
+    moves
+  )
+
+  expect_false(12L %in% out$player_id)
+})
+
+test_that("an alter exclusion applies without roster history", {
+  ex <- list(list(
+    action = "ex",
+    player_id = 12L,
+    action_date = as.character(cur_date)
+  ))
+  out <- grey_prep(
+    list(matchup = 7L),
+    grey_fixtures()$df_base,
+    grey_rv(),
+    grey_opponent,
+    ex
+  )
+
+  expect_equal(
+    grey_intervals(out, 12L),
+    tibble(start = cur_date, end = as.Date("3000-01-01"))
+  )
+})
+
+test_that("an exclusion dated before today is ignored", {
+  ex <- list(list(
+    action = "ex",
+    player_id = 12L,
+    action_date = as.character(cur_date - 1)
+  ))
+  out <- grey_prep(
+    list(matchup = 5L),
+    grey_fixtures()$df_base,
+    grey_rv(),
+    grey_opponent,
+    ex
+  )
+
+  expect_false(12L %in% out$player_id)
+})
+
+test_that("an exclusion only applies from the current matchup onward", {
+  ex <- list(list(
+    action = "ex",
+    player_id = 12L,
+    action_date = as.character(cur_date)
+  ))
+  out <- grey_prep(
+    list(matchup = 4L),
+    grey_fixtures()$df_base,
+    grey_rv(),
+    grey_opponent,
+    ex
+  )
+
+  expect_false(12L %in% out$player_id)
 })

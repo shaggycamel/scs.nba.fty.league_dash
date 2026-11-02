@@ -27,6 +27,21 @@ test_that("games_remaining counts only available players", {
   expect_equal(pull(sums, games_remaining, player_team), c(Us = 3, Them = 2))
 })
 
+test_that("games_remaining stops at matchup_end and ignores the post-matchup days", {
+  # As in the player table: the two post-matchup days render after the total,
+  # so they must not be added in.
+  limited_base <- fake_h2h_base(
+    roster,
+    game_days,
+    matchup_end = cur_date + 1,
+    matchup_end_plus = cur_date + 3
+  )
+  limited_tbl <- table_data_prep(limited_base, NULL, no_grey_players(), game_days[1])
+  sums <- table_sum_data_prep(limited_tbl, limited_base, game_days[1])
+
+  expect_equal(pull(sums, games_remaining, player_team), c(Us = 1, Them = 1))
+})
+
 test_that("a pin past the last game day leaves no games remaining", {
   expect_no_error(sums <- table_sum_data_prep(df_tbl, df_base, cur_date + 30))
   expect_equal(sums$games_remaining, c(0, 0))

@@ -8,6 +8,9 @@ plot_fixture <- function() {
     player_id = c(1L, 2L, 3L),
     player_name = c("A", "B", "C"),
     inj_status = c(NA, "Out", NA),
+    game_date = as.Date("2026-01-02"),
+    matchup_start = as.Date("2025-12-29"),
+    matchup_end = as.Date("2026-01-04"),
     fgm = c(10, 4, 2),
     fga = c(20, 8, 5),
     ftm = c(5, 2, 1),
@@ -72,6 +75,41 @@ test_that("a player listed Out contributes nothing to the totals", {
   expect_match(pull(me, label, name)[["pts"]], "Total: 30", fixed = TRUE)
 })
 
+test_that("games after the matchup end do not reach the plot", {
+  df <- plot_fixture()
+  lookahead <- df |>
+    slice(1) |>
+    mutate(game_date = matchup_end + 1, pts = 100)
+  lookahead_only <- df |>
+    slice(1) |>
+    mutate(
+      player_id = 4L,
+      player_name = "D",
+      game_date = matchup_end + 1,
+      pts = 99
+    )
+
+  out <- plot_prep(bind_rows(df, lookahead, lookahead_only))
+  me <- filter(out, competitor == "Me")
+
+  expect_equal(pull(me, value, name)[["pts"]], 30)
+  expect_false(any(str_detect(me$label, "D: ")))
+})
+
+test_that("excluded rows do not reach the plot", {
+  df <- plot_fixture() |>
+    mutate(
+      excluded = player_id == 1L,
+      inj_status = NA_character_
+    )
+
+  out <- plot_prep(df)
+  me <- filter(out, competitor == "Me")
+
+  expect_equal(pull(me, value, name)[["pts"]], 10)
+  expect_false(any(str_detect(me$label, "A: ")))
+})
+
 test_that("each competitor's categories are ordered with percentages last", {
   out <- plot_prep(plot_fixture())
 
@@ -97,6 +135,22 @@ test_that("weighted category rows keep their signs", {
 
   expect_equal(tov$value, -6)
   expect_match(tov$label, "Total: -6", fixed = TRUE)
+})
+
+test_that("post-matchup games are excluded from FTY points", {
+  df <- plot_fixture() |>
+    filter(competitor == "Me")
+  df <- bind_rows(
+    df,
+    df |>
+      slice(1) |>
+      mutate(game_date = matchup_end + 1, pts = 100)
+  )
+
+  out <- points_prep(df)
+  me <- filter(out, competitor == "Me")
+
+  expect_equal(pull(me, value, name)[["FTY Pts"]], 36)
 })
 
 test_that("postseason plot data combines completed matchups for one competitor", {

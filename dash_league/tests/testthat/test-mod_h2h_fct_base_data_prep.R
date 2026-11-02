@@ -9,8 +9,18 @@ base_fixtures <- function() {
     past = list(
       "1" = list(
         "5" = list(
-          "1" = tibble(player_id = 10L, game_date = cur_date - 2, pts = 5),
-          "2" = tibble(player_id = 20L, game_date = cur_date - 2, pts = 7)
+          "1" = tibble(
+            player_id = 10L,
+            game_date = cur_date - 2,
+            pts = 5,
+            scheduled_to_play = 1
+          ),
+          "2" = tibble(
+            player_id = 20L,
+            game_date = cur_date - 2,
+            pts = 7,
+            scheduled_to_play = 1
+          )
         )
       )
     ),
@@ -23,6 +33,7 @@ base_fixtures <- function() {
               player_id = c(10L, 11L),
               game_date = c(cur_date + 1, cur_date + 2),
               pts = c(3, 4),
+              scheduled_to_play = 1,
               matchup_start = cur_date - 1,
               matchup_end = cur_date + 3
             )
@@ -32,8 +43,31 @@ base_fixtures <- function() {
               player_id = 20L,
               game_date = cur_date + 1,
               pts = 6,
+              scheduled_to_play = 1,
               matchup_start = cur_date - 1,
               matchup_end = cur_date + 3
+            )
+          )
+        ),
+        "6" = list(
+          "1" = list(
+            "7" = tibble(
+              player_id = 10L,
+              game_date = cur_date + 8,
+              pts = 3,
+              scheduled_to_play = 1,
+              matchup_start = cur_date + 7,
+              matchup_end = cur_date + 13
+            )
+          ),
+          "2" = list(
+            "7" = tibble(
+              player_id = 20L,
+              game_date = cur_date + 8,
+              pts = 6,
+              scheduled_to_play = 1,
+              matchup_start = cur_date + 7,
+              matchup_end = cur_date + 13
             )
           )
         ),
@@ -45,6 +79,7 @@ base_fixtures <- function() {
               player_id = 30L,
               game_date = c(cur_date + 2, cur_date + 4, cur_date + 10),
               pts = c(2, 1, 9),
+              scheduled_to_play = 1,
               matchup_start = cur_date - 1,
               matchup_end = cur_date + 100
             )
@@ -109,18 +144,41 @@ test_that("a bye shows only the competitor's own team", {
   expect_setequal(out$player_id, c(10L, 11L))
 })
 
-test_that("a drop removes the player's remaining games from the current matchup", {
+test_that("a drop keeps the player's row but excludes their remaining games", {
   moves <- list(list(
     action = "ex",
     player_id = 10L,
     action_date = as.character(cur_date)
   ))
   out <- base_prep(base_input(), base_rv(), base_opponent(), moves)
+  dropped <- filter(out, competitor == "Me", player_id == 10L)
 
-  expect_false(10L %in% filter(out, competitor == "Me")$player_id)
-  expect_true(11L %in% filter(out, competitor == "Me")$player_id)
+  expect_equal(nrow(dropped), 1L)
+  expect_true(dropped$excluded)
+  expect_equal(dropped$scheduled_to_play, 0)
+  expect_false(any(filter(out, player_id == 11L)$excluded))
   # The opponent's side is untouched.
   expect_true(20L %in% filter(out, competitor == "Rival")$player_id)
+  expect_false(any(filter(out, competitor == "Rival")$excluded))
+})
+
+test_that("a drop only excludes games from the action date onward", {
+  moves <- list(list(
+    action = "ex",
+    player_id = 10L,
+    action_date = as.character(cur_date)
+  ))
+  out <- base_prep(
+    base_input(future_only = FALSE),
+    base_rv(),
+    base_opponent(),
+    moves
+  )
+  dropped <- filter(out, player_id == 10L) |>
+    arrange(game_date)
+
+  expect_equal(dropped$excluded, c(FALSE, TRUE))
+  expect_equal(dropped$scheduled_to_play, c(1, 0))
 })
 
 test_that("an add brings a free agent's games into the current matchup", {
@@ -149,6 +207,22 @@ test_that("an added free agent is confined to the current matchup", {
   expect_equal(fa$matchup_end_plus, c(NA, cur_date + 5))
 })
 
+test_that("an add persists into later matchups without earlier games leaking in", {
+  input <- base_input()
+  input$matchup <- "6"
+  moves <- list(list(
+    action = "add",
+    player_id = 30L,
+    action_date = as.character(cur_date)
+  ))
+  out <- base_prep(input, base_rv(), base_opponent(), moves)
+  fa <- filter(out, player_id == 30L)
+
+  expect_equal(fa$game_date, cur_date + 10)
+  expect_equal(fa$matchup_start, cur_date + 7)
+  expect_true(all(fa$game_date >= fa$matchup_start))
+})
+
 test_that("a move dated before today has already been applied and is ignored", {
   moves <- list(list(
     action = "ex",
@@ -158,4 +232,5 @@ test_that("a move dated before today has already been applied and is ignored", {
   out <- base_prep(base_input(), base_rv(), base_opponent(), moves)
 
   expect_true(10L %in% filter(out, competitor == "Me")$player_id)
+  expect_false(any(out$excluded))
 })

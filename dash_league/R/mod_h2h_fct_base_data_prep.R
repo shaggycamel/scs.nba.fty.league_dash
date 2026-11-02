@@ -1,3 +1,10 @@
+ensure_excluded <- function(df) {
+  if (!"excluded" %in% names(df)) df$excluded <- FALSE
+  df$excluded <- coalesce(df$excluded, FALSE)
+  df
+}
+
+
 base_data_prep <- function(input, rv_carry_thru, opponent, rv_alter_team) {
   if (length(rv_alter_team) > 0) {
     df_alter <- tibble(
@@ -32,9 +39,26 @@ base_data_prep <- function(input, rv_carry_thru, opponent, rv_alter_team) {
           } else {
             pluck(dfs_h2h_future, l_id, input$matchup, x, input$window) |>
               (\(df) {
-                # fmt: skip
-                if (!is.null(ex)) df <- anti_join(df, ex, by = join_by(player_id, game_date >= action_date))
+                if (is.null(df)) {
+                  return(NULL)
+                }
+
+                ex_rows <- NULL
+                if (!is.null(ex)) {
+                  ex_rows <- df |>
+                    inner_join(
+                      ex |> summarise(action_date = min(action_date), .by = player_id),
+                      by = join_by(player_id, game_date >= action_date)
+                    ) |>
+                    mutate(excluded = TRUE, scheduled_to_play = 0) |>
+                    select(-action_date)
+                  # fmt: skip
+                  df <- anti_join(df, ex, by = join_by(player_id, game_date >= action_date))
+                }
+
+                add_applied <- FALSE
                 if (!is.null(add) && nrow(df) > 0) {
+                  add_applied <- TRUE
                   current_start <- min(df$matchup_start, na.rm = TRUE)
                   current_end <- max(df$matchup_end, na.rm = TRUE)
 
@@ -43,7 +67,7 @@ base_data_prep <- function(input, rv_carry_thru, opponent, rv_alter_team) {
                       dfs_h2h_future |>
                         pluck(l_id, "free_agent", "free_agent", input$window) |>
                         inner_join(add, by = join_by(player_id, game_date >= action_date)) |>
-                        filter(game_date <= current_end + 2) |>
+                        filter(game_date >= current_start, game_date <= current_end + 2) |>
                         mutate(
                           matchup_start = current_start,
                           matchup_end = current_end,
@@ -55,6 +79,16 @@ base_data_prep <- function(input, rv_carry_thru, opponent, rv_alter_team) {
                         )
                     )
                 }
+
+                df <- df |> mutate(excluded = FALSE)
+
+                if (!is.null(ex_rows)) {
+                  if (add_applied) {
+                    ex_rows <- anti_join(ex_rows, distinct(add, player_id), by = join_by(player_id))
+                  }
+                  df <- bind_rows(df, ex_rows)
+                }
+
                 df
               })()
           }
@@ -62,6 +96,7 @@ base_data_prep <- function(input, rv_carry_thru, opponent, rv_alter_team) {
       ),
       .id = "tense"
     ) |>
+      ensure_excluded() |>
       mutate(
         competitor_id = as.integer(x),
         competitor = pluck(ls_fty_lookup, "cp_id_to_name", l_id, x)

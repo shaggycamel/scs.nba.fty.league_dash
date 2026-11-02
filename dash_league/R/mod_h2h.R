@@ -416,12 +416,13 @@ mod_h2h_server <- function(
       }
 
       req(nrow(df_base()) > 0)
+      req(any(!df_base()$excluded, na.rm = TRUE))
       plot_data_prep(df_base(), rv_carry_thru)
     })
 
     df_grey_player <- reactive({
       req(nrow(df_base()) > 0)
-      grey_player_data_prep(input, df_base(), rv_carry_thru, opponent)
+      grey_player_data_prep(input, df_base(), rv_carry_thru, opponent, rv_alter_team())
     })
 
     # the last matchup has no following week to look ahead to

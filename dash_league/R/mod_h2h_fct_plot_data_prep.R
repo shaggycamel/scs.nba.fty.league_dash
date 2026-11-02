@@ -1,4 +1,11 @@
 plot_data_prep <- function(df_base, rv_carry_thru) {
+  if ("excluded" %in% names(df_base)) {
+    df_base <- filter(df_base, !coalesce(excluded, FALSE))
+  }
+
+  df_base <- df_base |>
+    filter(game_date >= matchup_start, game_date <= matchup_end)
+
   stat_weights <- df_fty_cat_weights |>
     filter(
       league_id == as.integer(rv_carry_thru$league_id),

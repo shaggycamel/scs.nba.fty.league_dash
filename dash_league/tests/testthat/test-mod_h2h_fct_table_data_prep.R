@@ -72,10 +72,9 @@ test_that("games_remaining sits ahead of the post-matchup days", {
   )
 })
 
-test_that("games_remaining counts past matchup_end into the post-matchup days", {
-  # Documents current behaviour rather than endorsing it: the column is placed
-  # ahead of the two post-matchup days, but the total still spans them. Ann has
-  # one game left before matchup_end and is reported as three.
+test_that("games_remaining stops at matchup_end and ignores the post-matchup days", {
+  # The column is placed ahead of the two post-matchup days, so the total must
+  # not span them. Ann has one game left before matchup_end, not three.
   df_base <- fake_h2h_base(
     roster,
     game_days,
@@ -84,7 +83,7 @@ test_that("games_remaining counts past matchup_end into the post-matchup days", 
   )
   tbl <- table_data_prep(df_base, NULL, no_grey_players(), game_days[1])
 
-  expect_equal(pull(tbl, games_remaining, player_name), c(Ann = 3, Bob = 3, Cyd = 2))
+  expect_equal(pull(tbl, games_remaining, player_name), c(Ann = 1, Bob = 2, Cyd = 1))
 })
 
 test_that("a matchup spanning new year resolves its columns correctly", {
