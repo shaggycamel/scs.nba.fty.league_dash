@@ -126,7 +126,14 @@ dfs_rolling_stats <- df_nba_player_box_score |>
       df_t |>
         mutate(
           across(any_of(player_stat_cols), \(x) {
-            slider::slide_period_dbl(x, game_date, "day", ~ median(.x, na.rm = TRUE), .before = window, .after = -1)
+            slider::slide_period_dbl(
+              x,
+              game_date,
+              "day",
+              ~ mean(.x, na.rm = TRUE),
+              .before = window - 1,
+              .after = 0
+            )
           }),
           .by = player_id
         ) |>
