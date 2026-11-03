@@ -433,6 +433,17 @@ mod_h2h_server <- function(
     }) |>
       bindEvent(input$matchup, rv_carry_thru$league_id)
 
+    starter_count <- reactive({
+      req(rv_carry_thru$league_id)
+      count <- pluck(
+        ls_fty_lookup,
+        "lg_id_to_starter_count",
+        as.character(rv_carry_thru$league_id),
+        .default = 10
+      )
+      if (is.null(count) || is.na(count)) 10 else count
+    })
+
     df_tbl <- reactive({
       req(nrow(df_base()) > 0, df_grey_player(), input$pin_date)
       table_data_prep(
@@ -446,7 +457,7 @@ mod_h2h_server <- function(
 
     df_tbl_sum <- reactive({
       req(df_tbl())
-      table_sum_data_prep(df_tbl(), df_base(), as.Date(input$pin_date))
+      table_sum_data_prep(df_tbl(), df_base(), as.Date(input$pin_date), starter_count())
     })
 
     # Plot -------------------------------------------------------------------
@@ -536,17 +547,10 @@ mod_h2h_server <- function(
       # Read off the table rather than df_base, which has no rows for the days
       # that fill_missing_days() added.
       col_dates <- col_dates_from_labels(names(df_tbl()), min(df_base()$matchup_start, na.rm = TRUE))
-      starter_count <- pluck(
-        ls_fty_lookup,
-        "lg_id_to_starter_count",
-        as.character(rv_carry_thru$league_id),
-        .default = 10
-      )
-      if (is.null(starter_count) || is.na(starter_count)) starter_count <- 10
 
       col_fmt_sum <- game_tbl_col_fmt(
         df_tbl_sum(), input$pin_date, mup_end, col_dates,
-        type = "sum", starter_count = starter_count
+        type = "sum", starter_count = starter_count()
       )
 
       htmlwidgets::onRender(
@@ -565,7 +569,7 @@ mod_h2h_server <- function(
             df_details <- filter(df_tbl(), competitor == df_tbl_sum()$player_team[ix])
             col_fmt <- game_tbl_col_fmt(
               df_details, input$pin_date, mup_end, col_dates,
-              starter_count = starter_count
+              starter_count = starter_count()
             )
 
             tags$div(

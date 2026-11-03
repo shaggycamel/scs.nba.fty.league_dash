@@ -210,7 +210,7 @@ table_data_prep <- function(df_base, rv_carry_thru, df_grey_player, pin_date, po
     left_join(df_grey_player, by = join_by(player_id, competitor_id))
 }
 
-table_sum_data_prep <- function(df_tbl, df_base, pin_date) {
+table_sum_data_prep <- function(df_tbl, df_base, pin_date, starter_count) {
   df_sum <- df_tbl |>
     summarise(
       across(
@@ -241,7 +241,8 @@ table_sum_data_prep <- function(df_tbl, df_base, pin_date) {
       games_remaining = if (cur_date > unique(na.omit(df_base$matchup_end))) {
         0
       } else {
-        sum(as.numeric(str_remove(c_across(all_of(remaining_cols)), "\\*")), na.rm = TRUE)
+        daily <- as.numeric(str_remove(c_across(all_of(remaining_cols)), "\\*"))
+        sum(pmin(daily, starter_count), na.rm = TRUE)
       },
       .before = if (all(is.na(df_base$matchup_end_plus))) last_col() else last_col(2)
     ) |>
