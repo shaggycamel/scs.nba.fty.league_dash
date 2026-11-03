@@ -124,7 +124,7 @@ test_that("a points league's h2h past totals reconcile with the official matchup
   on.exit(DBI::dbDisconnect(con), add = TRUE)
 
   pkg <- as.environment("package:league")
-  needed <- c("dfs_h2h_past", "df_fty_cat_weights", "df_fty_base")
+  needed <- c("dfs_h2h_past", "df_fty_cat_weights", "df_fty_base", "cur_date")
   skip_if_not(all(rlang::env_has(pkg, needed)), "package data not built")
 
   season <- unique(pkg[["df_fty_base"]]$season)
@@ -147,7 +147,10 @@ test_that("a points league's h2h past totals reconcile with the official matchup
     dplyr::filter(
       !is.na(game_date),
       game_date <= matchup_end,
-      matchup_start >= covered
+      matchup_start >= covered,
+      # A live matchup's official score is still moving, and its later games
+      # have no box score yet, so only a closed one can be compared.
+      matchup_end < pkg[["cur_date"]]
     )
   skip_if(nrow(past) == 0, "no completed matchups inside the slot-covered window")
 
@@ -179,6 +182,7 @@ test_that("a points league's h2h past totals reconcile with the official matchup
     by = dplyr::join_by(league_id, matchup_period == matchup, competitor_id)
   )
   skip_if(nrow(reconciled) == 0, "no official scores for the slot-covered matchups")
+  skip_if(all(reconciled$score <= 0), "no scored matchups inside the slot-covered window")
 
   # A daily snapshot can miss a line-up change made after the run, so this is a
   # near-match rather than an exact one; leaving a bench player in, by contrast,
