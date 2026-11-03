@@ -7,6 +7,7 @@ cell_style <- function(col_fmt, col, value, index = 1) {
 pin_yellow <- list(background = "#f1e78e94")
 alert_red <- list(background = "#ea7878ff")
 grey_shade <- list(background = "#d7d7d5", color = "#d7d7d5")
+bench_blue <- list(background = "#bcd7ee")
 
 test_that("the pinned day is highlighted", {
   days <- cur_date + 0:2
@@ -88,7 +89,8 @@ test_that("dates inside a player's grey intervals are shaded", {
   grey <- tibble(
     player_id = 1L,
     competitor_id = 1L,
-    grey_intervals = list(tibble(start = days[c(2, 4)], end = days[c(2, 4)]))
+    grey_intervals = list(tibble(start = days[c(2, 4)], end = days[c(2, 4)])),
+    bench_intervals = list(tibble(start = as.Date(character()), end = as.Date(character())))
   )
   tbl <- table_data_prep(df_base, NULL, grey, days[1])
   labels <- format(days, "%a (%d/%m)")
@@ -98,4 +100,22 @@ test_that("dates inside a player's grey intervals are shaded", {
   expect_equal(cell_style(col_fmt, labels[4], "1", index = 1), grey_shade)
   expect_null(cell_style(col_fmt, labels[1], "1", index = 1))
   expect_equal(cell_style(col_fmt, labels[3], "1", index = 1), pin_yellow)
+})
+
+test_that("dates a player spent on the bench are shaded differently from absence", {
+  days <- cur_date + 0:3
+  df_base <- fake_h2h_base(h2h_test_roster(), days)
+  bench <- tibble(
+    player_id = 1L,
+    competitor_id = 1L,
+    grey_intervals = list(tibble(start = days[2], end = days[2])),
+    bench_intervals = list(tibble(start = days[3], end = days[3]))
+  )
+  tbl <- table_data_prep(df_base, NULL, bench, days[1])
+  labels <- format(days, "%a (%d/%m)")
+  col_fmt <- game_tbl_col_fmt(tbl, days[1], max(days), col_dates_from_labels(names(tbl), min(df_base$matchup_start)))
+
+  expect_equal(cell_style(col_fmt, labels[2], "1", index = 1), grey_shade)
+  expect_equal(cell_style(col_fmt, labels[3], "1", index = 1), bench_blue)
+  expect_null(cell_style(col_fmt, labels[4], "1", index = 1))
 })

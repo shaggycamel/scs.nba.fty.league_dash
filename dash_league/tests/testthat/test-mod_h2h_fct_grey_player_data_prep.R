@@ -104,6 +104,13 @@ grey_intervals <- function(out, player_id, competitor_id = 1L) {
     pluck(1)
 }
 
+bench_intervals <- function(out, player_id, competitor_id = 1L) {
+  out |>
+    filter(player_id == !!player_id, competitor_id == !!competitor_id) |>
+    pull(bench_intervals) |>
+    pluck(1)
+}
+
 test_that("a player rostered throughout has no grey intervals", {
   out <- grey_prep(
     list(matchup = 5L),
@@ -182,7 +189,7 @@ test_that("a missing snapshot day does not split a stint", {
   expect_false(20L %in% out$player_id)
 })
 
-test_that("a bench day inside a stint is grey", {
+test_that("a bench day inside a stint is marked as benched, not absent", {
   roster <- grey_fixtures()$roster |>
     mutate(
       lineup_slot = if_else(player_id == 12L & assigned_date == cur_date - 2, "BE", lineup_slot)
@@ -198,12 +205,13 @@ test_that("a bench day inside a stint is grey", {
   )
 
   expect_equal(
-    grey_intervals(out, 12L),
+    bench_intervals(out, 12L),
     tibble(start = cur_date - 2, end = cur_date - 2)
   )
+  expect_equal(nrow(grey_intervals(out, 12L)), 0)
 })
 
-test_that("a player left on the bench at the latest snapshot is grey only up to it", {
+test_that("a player left on the bench at the latest snapshot is benched only up to it", {
   roster <- grey_fixtures()$roster |>
     mutate(
       lineup_slot = if_else(player_id == 13L & assigned_date == cur_date, "BE", lineup_slot)
@@ -220,10 +228,11 @@ test_that("a player left on the bench at the latest snapshot is grey only up to 
 
   expect_equal(
     grey_intervals(out, 13L),
-    tibble(
-      start = c(cur_date - 3, cur_date),
-      end = c(cur_date - 3, cur_date)
-    )
+    tibble(start = cur_date - 3, end = cur_date - 3)
+  )
+  expect_equal(
+    bench_intervals(out, 13L),
+    tibble(start = cur_date, end = cur_date)
   )
 })
 
@@ -280,7 +289,7 @@ test_that("the result carries the player and competitor with their intervals", {
     grey_opponent
   )
 
-  expect_named(out, c("competitor_id", "player_id", "grey_intervals"))
+  expect_named(out, c("competitor_id", "player_id", "grey_intervals", "bench_intervals"))
 })
 
 test_that("a matchup with no roster history has no grey intervals", {
@@ -293,7 +302,7 @@ test_that("a matchup with no roster history has no grey intervals", {
     )
   )
 
-  expect_named(out, c("competitor_id", "player_id", "grey_intervals"))
+  expect_named(out, c("competitor_id", "player_id", "grey_intervals", "bench_intervals"))
   expect_equal(nrow(out), 0)
 })
 

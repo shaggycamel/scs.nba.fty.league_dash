@@ -68,7 +68,8 @@ no_grey_players <- function() {
   tibble(
     player_id = integer(),
     competitor_id = integer(),
-    grey_intervals = list()
+    grey_intervals = list(),
+    bench_intervals = list()
   )
 }
 
