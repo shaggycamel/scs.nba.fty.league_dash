@@ -117,3 +117,72 @@ test_that("a points league's weighted categories reproduce ESPN's official match
 
   expect_equal(mismatches, 0L)
 })
+
+test_that("a points league's h2h past totals reconcile with the official matchup score", {
+  con <- pipeline_db()
+  skip_if(is.null(con), "no local NBA database available")
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+
+  pkg <- as.environment("package:league")
+  needed <- c("dfs_h2h_past", "df_fty_cat_weights", "df_fty_base")
+  skip_if_not(all(rlang::env_has(pkg, needed)), "package data not built")
+
+  season <- unique(pkg[["df_fty_base"]]$season)
+  skip_if(length(season) != 1, "package data spans more than one season")
+
+  weights <- dplyr::filter(pkg[["df_fty_cat_weights"]], !is.na(points))
+  skip_if(nrow(weights) == 0, "no points league in the built leagues")
+
+  # Only matchups whose roster snapshots all carry a slot can be expected to
+  # match: the line-up was not captured before that date.
+  covered <- DBI::dbGetQuery(con, sprintf(
+    "SELECT min(assigned_date) AS first_date
+       FROM fty.competitor_roster
+      WHERE season = '%s' AND lineup_slot IS NOT NULL",
+    season
+  ))$first_date
+  skip_if(is.na(covered), "no lineup slots captured for the built season yet")
+
+  past <- flatten_h2h_past(pkg[["dfs_h2h_past"]]) |>
+    dplyr::filter(
+      !is.na(game_date),
+      game_date <= matchup_end,
+      matchup_start >= covered
+    )
+  skip_if(nrow(past) == 0, "no completed matchups inside the slot-covered window")
+
+  cats <- unique(weights$nba_category)
+
+  totals <- past |>
+    dplyr::select(league_id, matchup_period, competitor_id, tidyselect::any_of(cats)) |>
+    tidyr::pivot_longer(tidyselect::any_of(cats), names_to = "nba_category", values_to = "value") |>
+    dplyr::inner_join(
+      dplyr::select(weights, league_id, nba_category, points),
+      by = dplyr::join_by(league_id, nba_category)
+    ) |>
+    dplyr::summarise(
+      total = sum(value * points, na.rm = TRUE),
+      .by = c(league_id, matchup_period, competitor_id)
+    )
+
+  official <- DBI::dbGetQuery(con, sprintf(
+    "SELECT league_id::int AS league_id, matchup::int AS matchup,
+            competitor_id::int AS competitor_id, score
+       FROM fty.matchup_result
+      WHERE season = '%s'",
+    season
+  ))
+
+  reconciled <- dplyr::inner_join(
+    totals,
+    official,
+    by = dplyr::join_by(league_id, matchup_period == matchup, competitor_id)
+  )
+  skip_if(nrow(reconciled) == 0, "no official scores for the slot-covered matchups")
+
+  # A daily snapshot can miss a line-up change made after the run, so this is a
+  # near-match rather than an exact one; leaving a bench player in, by contrast,
+  # overshoots by tens of percent.
+  relative_error <- abs(reconciled$total - reconciled$score) / pmax(reconciled$score, 1)
+  expect_lte(max(relative_error), 0.05)
+})

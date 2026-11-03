@@ -72,6 +72,26 @@ no_grey_players <- function() {
   )
 }
 
+# dfs_h2h_past nests league -> matchup period -> competitor -> games. Flatten
+# it to one row per game with the three nesting keys as integer columns.
+flatten_h2h_past <- function(past) {
+  purrr::imap(past, \(lg, lg_id) {
+    purrr::imap(lg, \(mp, mp_id) {
+      purrr::imap(mp, \(cp, cp_id) {
+        dplyr::mutate(
+          cp,
+          league_id = as.integer(lg_id),
+          matchup_period = as.integer(mp_id),
+          competitor_id = suppressWarnings(as.integer(cp_id))
+        )
+      }) |>
+        purrr::list_rbind()
+    }) |>
+      purrr::list_rbind()
+  }) |>
+    purrr::list_rbind()
+}
+
 # The roster used across both test files: Ann and Bob share a competitor so the
 # summary table has something to add up, and Bob is Out so his cells carry the
 # "*" marker that as.numeric() cannot read on its own.

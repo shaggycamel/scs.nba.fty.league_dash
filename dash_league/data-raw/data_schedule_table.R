@@ -16,7 +16,7 @@ dfs_fty_nba_mup_weeks <-
         x |>
           distinct(league_id, matchup_period, matchup_start, matchup_end, matchup) |>
           mutate(matchup_end_plus = matchup_end + ddays(2), ) |>
-          left_join(
+          inner_join(
             select(x, -starts_with("matchup")),
             by = join_by(league_id, matchup_end < game_date, matchup_end_plus >= game_date)
           ) |>
@@ -28,7 +28,7 @@ dfs_fty_nba_mup_weeks <-
     .by = c(league_id, matchup_period),
     .after = weekday
   ) |>
-  na.omit() |> # ACTUALLY NEED TO FIGURE OUT WHERE NA VALUES ARE COMING FROM
+  na.omit() |> # Post Fantasy has no game dates, so its rows are all NA
   nest_by(league_id) |>
   deframe() |>
   map(\(x) {

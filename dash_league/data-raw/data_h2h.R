@@ -2,7 +2,7 @@
 
 dfs_h2h_past <- dfs_fty_roster |>
   list_rbind(names_to = "league_id") |>
-  filter(assigned_date < cur_date) |>
+  filter(assigned_date < cur_date, is_starting_lineup(lineup_slot)) |>
   left_join(
     select(df_nba_schedule, team, game_date, scheduled_to_play, game_id),
     by = join_by(player_team == team, assigned_date == game_date)
@@ -21,7 +21,7 @@ dfs_h2h_past <- dfs_fty_roster |>
       df |>
         distinct(league_id, matchup_period, matchup_start, matchup_end) |>
         mutate(matchup_end_plus = matchup_end + ddays(2), ) |>
-        left_join(
+        inner_join(
           select(df, -starts_with("matchup")),
           by = join_by(league_id, matchup_end < game_date, matchup_end_plus >= game_date)
         )

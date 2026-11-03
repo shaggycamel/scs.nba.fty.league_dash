@@ -6,12 +6,16 @@
 test_that("a points league's standings reconcile with its weighted category totals", {
   pkg <- as.environment("package:league")
   needed <- c("dfs_fty_standings", "dfs_fty_standings_cats")
-  skip_if_not(rlang::env_has(pkg, needed), "package data not built")
+  skip_if_not(all(rlang::env_has(pkg, needed)), "package data not built")
 
   standings_all <- pkg[["dfs_fty_standings"]]
   cats_all <- pkg[["dfs_fty_standings_cats"]]
 
-  points_leagues <- keep(names(standings_all), \(lg) "points_for" %in% names(standings_all[[lg]]))
+  # group_modify fills points_for with NA for the leagues that score by category,
+  # so presence of the column is not enough to call a league a points league.
+  points_leagues <- keep(names(standings_all), \(lg) {
+    "points_for" %in% names(standings_all[[lg]]) && any(!is.na(standings_all[[lg]]$points_for))
+  })
   skip_if(length(points_leagues) == 0, "no points-league standings to reconcile")
 
   for (lg in points_leagues) {
@@ -140,4 +144,32 @@ test_that("every built league has free-agent future games", {
       expect_true(all(windows[[window]]$matchup_start <= windows[[window]]$matchup_end))
     }
   }
+})
+
+test_that("h2h past rows all trace to a starting slot on the competitor's roster", {
+  pkg <- as.environment("package:league")
+  needed <- c("dfs_h2h_past", "dfs_fty_roster")
+  skip_if_not(all(rlang::env_has(pkg, needed)), "package data not built")
+
+  past <- flatten_h2h_past(pkg[["dfs_h2h_past"]])
+  skip_if(nrow(past) == 0, "no past games built yet")
+
+  # The two-day lookahead re-tags a game onto the previous matchup period, but it
+  # keeps the roster date, so match on that rather than on the period.
+  expect_false(any(is.na(past$player_id)))
+  expect_false(any(is.na(past$game_date)))
+
+  roster <- pkg[["dfs_fty_roster"]] |>
+    purrr::list_rbind(names_to = "league_id") |>
+    dplyr::mutate(league_id = as.integer(league_id)) |>
+    dplyr::filter(is_starting_lineup(lineup_slot)) |>
+    dplyr::select(league_id, competitor_id, player_id, assigned_date)
+
+  unmatched <- dplyr::anti_join(
+    past,
+    roster,
+    by = dplyr::join_by(league_id, competitor_id, player_id, game_date == assigned_date)
+  )
+
+  expect_equal(nrow(unmatched), 0)
 })

@@ -13,3 +13,14 @@ test_that("free agents get the earliest remaining matchup window per league", {
   expect_equal(fa$matchup_end, as.Date(c("2027-04-11", "2026-11-08")))
   expect_true(all(fa$matchup_start <= fa$matchup_end))
 })
+
+test_that("starting slots count and bench/IR do not", {
+  expect_true(all(is_starting_lineup(c("PG", "SG", "SF", "PF", "C", "UT", "G/F", "PF/C"))))
+  expect_false(any(is_starting_lineup(c("BE", "IR", ""))))
+})
+
+test_that("an unknown lineup slot counts as starting", {
+  expect_true(is_starting_lineup(NA_character_))
+  expect_equal(is_starting_lineup(c(NA, "BE", "C")), c(TRUE, FALSE, TRUE))
+})
+

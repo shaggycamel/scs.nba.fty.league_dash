@@ -1,11 +1,26 @@
-grey_intervals_from_stints <- function(start, end, matchup_start, latest_assigned_date) {
-  still_rostered <- isTRUE(max(end, na.rm = TRUE) == latest_assigned_date)
+grey_intervals_from_snapshots <- function(active, snapshot_dates, matchup_start, still_rostered) {
+  grey <- !active
+  if (!any(grey)) {
+    return(tibble(start = as.Date(character()), end = as.Date(character())))
+  }
 
-  grey_start <- c(matchup_start, end + 1)
-  grey_end <- c(start - 1, if (still_rostered) as.Date(NA) else as.Date("3000-01-01"))
+  run_id <- cumsum(grey & c(TRUE, !grey[-length(grey)]))
 
-  tibble(start = grey_start, end = grey_end) |>
-    filter(!is.na(start), !is.na(end), start <= end)
+  tibble(snapshot = seq_along(grey), grey = grey, run_id = if_else(grey, run_id, NA_integer_)) |>
+    filter(grey) |>
+    summarise(first = min(snapshot), last = max(snapshot), .by = run_id) |>
+    arrange(first) |>
+    mutate(
+      start = if_else(first == 1L, matchup_start, snapshot_dates[first]),
+      trailing = if (still_rostered) snapshot_dates[last] else as.Date("3000-01-01"),
+      end = if_else(
+        last < length(snapshot_dates),
+        snapshot_dates[last + 1L] - 1,
+        trailing
+      )
+    ) |>
+    filter(start <= end) |>
+    select(start, end)
 }
 
 
@@ -84,38 +99,32 @@ grey_player_data_prep <- function(input, df_base, rv_carry_thru, opponent, rv_al
   roster_grey <- if (nrow(roster) == 0) {
     empty_grey()
   } else {
+    matchup_start <- min(roster$matchup_start, na.rm = TRUE)
+
     observed <- roster |>
       distinct(competitor_id, assigned_date) |>
       arrange(competitor_id, assigned_date) |>
       mutate(snapshot = seq_along(assigned_date), .by = competitor_id)
 
-    latest <- observed |>
-      summarise(latest_assigned_date = max(assigned_date), .by = competitor_id)
-
-    roster |>
-      distinct(competitor_id, player_id, assigned_date, matchup_start) |>
+    roster_snapshots <- roster |>
+      distinct(competitor_id, player_id, assigned_date, lineup_slot) |>
+      mutate(active = is_starting_lineup(lineup_slot)) |>
       inner_join(observed, by = join_by(competitor_id, assigned_date)) |>
+      select(competitor_id, player_id, snapshot, active)
+
+    roster_snapshots |>
+      distinct(competitor_id, player_id) |>
+      inner_join(observed, by = join_by(competitor_id), relationship = "many-to-many") |>
+      left_join(roster_snapshots, by = join_by(competitor_id, player_id, snapshot)) |>
+      mutate(rostered = !is.na(active), active = coalesce(active, FALSE)) |>
       arrange(competitor_id, player_id, snapshot) |>
-      mutate(
-        new_stint = c(TRUE, diff(snapshot) > 1),
-        .by = c(competitor_id, player_id)
-      ) |>
-      mutate(stint = cumsum(new_stint), .by = c(competitor_id, player_id)) |>
-      summarise(
-        start = min(assigned_date),
-        end = max(assigned_date),
-        matchup_start = min(matchup_start, na.rm = TRUE),
-        .by = c(competitor_id, player_id, stint)
-      ) |>
-      left_join(latest, by = join_by(competitor_id)) |>
-      arrange(competitor_id, player_id, start) |>
       summarise(
         grey_intervals = list(
-          grey_intervals_from_stints(
-            start,
-            end,
-            matchup_start[1],
-            latest_assigned_date[1]
+          grey_intervals_from_snapshots(
+            active,
+            assigned_date,
+            matchup_start,
+            tail(rostered, 1)
           )
         ),
         .by = c(competitor_id, player_id)

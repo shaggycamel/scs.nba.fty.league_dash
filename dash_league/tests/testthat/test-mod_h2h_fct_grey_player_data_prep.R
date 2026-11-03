@@ -77,7 +77,7 @@ grey_fixtures <- function() {
       start
     ))
   ) |>
-    mutate(matchup_start = start, matchup_end = cur_date + 3)
+    mutate(matchup_start = start, matchup_end = cur_date + 3, lineup_slot = "PG")
 
   list(df_base = df_base, roster = roster)
 }
@@ -180,6 +180,71 @@ test_that("a missing snapshot day does not split a stint", {
   )
 
   expect_false(20L %in% out$player_id)
+})
+
+test_that("a bench day inside a stint is grey", {
+  roster <- grey_fixtures()$roster |>
+    mutate(
+      lineup_slot = if_else(player_id == 12L & assigned_date == cur_date - 2, "BE", lineup_slot)
+    )
+  local_pkg_data(dfs_fty_roster = list("1" = roster))
+
+  out <- grey_player_data_prep(
+    list(matchup = 5L),
+    grey_fixtures()$df_base,
+    grey_rv(),
+    grey_opponent,
+    list()
+  )
+
+  expect_equal(
+    grey_intervals(out, 12L),
+    tibble(start = cur_date - 2, end = cur_date - 2)
+  )
+})
+
+test_that("a player left on the bench at the latest snapshot is grey only up to it", {
+  roster <- grey_fixtures()$roster |>
+    mutate(
+      lineup_slot = if_else(player_id == 13L & assigned_date == cur_date, "BE", lineup_slot)
+    )
+  local_pkg_data(dfs_fty_roster = list("1" = roster))
+
+  out <- grey_player_data_prep(
+    list(matchup = 5L),
+    grey_fixtures()$df_base,
+    grey_rv(),
+    grey_opponent,
+    list()
+  )
+
+  expect_equal(
+    grey_intervals(out, 13L),
+    tibble(
+      start = c(cur_date - 3, cur_date),
+      end = c(cur_date - 3, cur_date)
+    )
+  )
+})
+
+test_that("an unknown lineup slot counts as starting", {
+  roster <- grey_fixtures()$roster |>
+    mutate(lineup_slot = NA_character_)
+  local_pkg_data(dfs_fty_roster = list("1" = roster))
+
+  out <- grey_player_data_prep(
+    list(matchup = 5L),
+    grey_fixtures()$df_base,
+    grey_rv(),
+    grey_opponent,
+    list()
+  )
+
+  expect_equal(
+    grey_intervals(out, 10L),
+    tibble(start = cur_date - 1, end = as.Date("3000-01-01"))
+  )
+  expect_false(12L %in% out$player_id)
 })
 
 test_that("grey intervals are built for the opponent as well", {
