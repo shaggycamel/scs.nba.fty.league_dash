@@ -28,14 +28,23 @@ local_pkg_data <- function(..., .env = parent.frame()) {
   withr::defer(restore(), envir = .env)
 }
 
-fake_player <- function(id, name, team, competitor, games, inj_status = NA_character_) {
+fake_player <- function(
+  id,
+  name,
+  team,
+  competitor,
+  games,
+  inj_status = NA_character_,
+  slot = NA_character_
+) {
   list(
     id = id,
     name = name,
     team = team,
     competitor = competitor,
     games = games,
-    inj_status = inj_status
+    inj_status = inj_status,
+    slot = slot
   )
 }
 
@@ -49,6 +58,7 @@ fake_h2h_base <- function(players, days, matchup_end = max(days), matchup_end_pl
         player_id = p$id,
         player_name = p$name,
         inj_status = p$inj_status,
+        lineup_slot = p$slot,
         game_date = days,
         fmt_date = format(days, "%a (%d/%m)"),
         # Recycled so one roster can be reused across fixtures of any length.
@@ -68,8 +78,7 @@ no_grey_players <- function() {
   tibble(
     player_id = integer(),
     competitor_id = integer(),
-    grey_intervals = list(),
-    bench_intervals = list()
+    grey_intervals = list()
   )
 }
 

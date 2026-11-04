@@ -104,13 +104,6 @@ grey_intervals <- function(out, player_id, competitor_id = 1L) {
     pluck(1)
 }
 
-bench_intervals <- function(out, player_id, competitor_id = 1L) {
-  out |>
-    filter(player_id == !!player_id, competitor_id == !!competitor_id) |>
-    pull(bench_intervals) |>
-    pluck(1)
-}
-
 test_that("a player rostered throughout has no grey intervals", {
   out <- grey_prep(
     list(matchup = 5L),
@@ -189,7 +182,7 @@ test_that("a missing snapshot day does not split a stint", {
   expect_false(20L %in% out$player_id)
 })
 
-test_that("a bench day inside a stint is marked as benched, not absent", {
+test_that("a bench day inside a stint is not treated as an absence", {
   roster <- grey_fixtures()$roster |>
     mutate(
       lineup_slot = if_else(player_id == 12L & assigned_date == cur_date - 2, "BE", lineup_slot)
@@ -204,55 +197,6 @@ test_that("a bench day inside a stint is marked as benched, not absent", {
     list()
   )
 
-  expect_equal(
-    bench_intervals(out, 12L),
-    tibble(start = cur_date - 2, end = cur_date - 2)
-  )
-  expect_equal(nrow(grey_intervals(out, 12L)), 0)
-})
-
-test_that("a player left on the bench at the latest snapshot is benched only up to it", {
-  roster <- grey_fixtures()$roster |>
-    mutate(
-      lineup_slot = if_else(player_id == 13L & assigned_date == cur_date, "BE", lineup_slot)
-    )
-  local_pkg_data(dfs_fty_roster = list("1" = roster))
-
-  out <- grey_player_data_prep(
-    list(matchup = 5L),
-    grey_fixtures()$df_base,
-    grey_rv(),
-    grey_opponent,
-    list()
-  )
-
-  expect_equal(
-    grey_intervals(out, 13L),
-    tibble(start = cur_date - 3, end = cur_date - 3)
-  )
-  expect_equal(
-    bench_intervals(out, 13L),
-    tibble(start = cur_date, end = cur_date)
-  )
-})
-
-test_that("an unknown lineup slot counts as starting", {
-  roster <- grey_fixtures()$roster |>
-    mutate(lineup_slot = NA_character_)
-  local_pkg_data(dfs_fty_roster = list("1" = roster))
-
-  out <- grey_player_data_prep(
-    list(matchup = 5L),
-    grey_fixtures()$df_base,
-    grey_rv(),
-    grey_opponent,
-    list()
-  )
-
-  expect_equal(
-    grey_intervals(out, 10L),
-    tibble(start = cur_date - 1, end = as.Date("3000-01-01"))
-  )
   expect_false(12L %in% out$player_id)
 })
 
@@ -289,7 +233,7 @@ test_that("the result carries the player and competitor with their intervals", {
     grey_opponent
   )
 
-  expect_named(out, c("competitor_id", "player_id", "grey_intervals", "bench_intervals"))
+  expect_named(out, c("competitor_id", "player_id", "grey_intervals"))
 })
 
 test_that("a matchup with no roster history has no grey intervals", {
@@ -302,7 +246,7 @@ test_that("a matchup with no roster history has no grey intervals", {
     )
   )
 
-  expect_named(out, c("competitor_id", "player_id", "grey_intervals", "bench_intervals"))
+  expect_named(out, c("competitor_id", "player_id", "grey_intervals"))
   expect_equal(nrow(out), 0)
 })
 
@@ -470,4 +414,122 @@ test_that("an exclusion only applies from the current matchup onward", {
   )
 
   expect_false(12L %in% out$player_id)
+})
+
+test_that("a free agent added via alter team is grey before the add date", {
+  added_base <- grey_fixtures()$df_base |>
+    tibble::add_row(
+      player_id = 99L,
+      competitor_id = 1L,
+      game_date = cur_date,
+      tense = "future",
+      matchup_start = cur_date - 3,
+      matchup_end = cur_date + 3
+    )
+  add <- list(list(
+    action = "add",
+    player_id = 99L,
+    action_date = as.character(cur_date)
+  ))
+  out <- grey_prep(
+    list(matchup = 5L),
+    added_base,
+    grey_rv(),
+    grey_opponent,
+    add
+  )
+
+  expect_equal(
+    grey_intervals(out, 99L),
+    tibble(start = cur_date - 3, end = cur_date - 1)
+  )
+})
+
+test_that("an add ends an earlier absence on the day before the add", {
+  add <- list(list(
+    action = "add",
+    player_id = 10L,
+    action_date = as.character(cur_date + 2)
+  ))
+  out <- grey_prep(
+    list(matchup = 5L),
+    grey_fixtures()$df_base,
+    grey_rv(),
+    grey_opponent,
+    add
+  )
+
+  expect_equal(
+    grey_intervals(out, 10L),
+    tibble(start = cur_date - 1, end = cur_date + 1)
+  )
+})
+
+test_that("an add leaves a genuinely rostered stretch unshaded", {
+  add <- list(list(
+    action = "add",
+    player_id = 12L,
+    action_date = as.character(cur_date + 2)
+  ))
+  out <- grey_prep(
+    list(matchup = 5L),
+    grey_fixtures()$df_base,
+    grey_rv(),
+    grey_opponent,
+    add
+  )
+
+  expect_false(12L %in% out$player_id)
+})
+
+test_that("an add dated before today is ignored", {
+  added_base <- grey_fixtures()$df_base |>
+    tibble::add_row(
+      player_id = 99L,
+      competitor_id = 1L,
+      game_date = cur_date,
+      tense = "future",
+      matchup_start = cur_date - 3,
+      matchup_end = cur_date + 3
+    )
+  add <- list(list(
+    action = "add",
+    player_id = 99L,
+    action_date = as.character(cur_date - 1)
+  ))
+  out <- grey_prep(
+    list(matchup = 5L),
+    added_base,
+    grey_rv(),
+    grey_opponent,
+    add
+  )
+
+  expect_false(99L %in% out$player_id)
+})
+
+test_that("an add only greys from the current matchup onward", {
+  added_base <- grey_fixtures()$df_base |>
+    tibble::add_row(
+      player_id = 99L,
+      competitor_id = 1L,
+      game_date = cur_date,
+      tense = "future",
+      matchup_start = cur_date - 3,
+      matchup_end = cur_date + 3
+    )
+  add <- list(list(
+    action = "add",
+    player_id = 99L,
+    action_date = as.character(cur_date)
+  ))
+  out <- grey_prep(
+    list(matchup = 4L),
+    added_base,
+    grey_rv(),
+    grey_opponent,
+    add
+  )
+
+  expect_false(99L %in% out$player_id)
 })

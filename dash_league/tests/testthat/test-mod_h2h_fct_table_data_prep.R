@@ -137,3 +137,65 @@ test_that("postseason roster uses the latest assignment snapshot for one competi
   expect_equal(roster$player_name, c("Ann", "Bob"))
   expect_equal(roster$player_team, c("LAL", "BOS"))
 })
+
+test_that("a benched past game is marked with b and still shows its 1", {
+  days <- cur_date - 3:1
+  roster <- list(
+    fake_player(1, "Ann", "LAL", "Us", c(1, 1, 1)),
+    fake_player(2, "Bob", "BOS", "Us", c(1, 1, 1), slot = "BE")
+  )
+  df_base <- fake_h2h_base(roster, days)
+  tbl <- table_data_prep(df_base, NULL, no_grey_players(), days[1])
+  labels <- format(days, "%a (%d/%m)")
+
+  expect_equal(filter(tbl, player_name == "Bob")[[labels[1]]], "1b")
+  expect_equal(filter(tbl, player_name == "Ann")[[labels[1]]], "1")
+})
+
+test_that("a non-out player in an IR slot is marked with b", {
+  days <- cur_date - 3:1
+  roster <- list(fake_player(1, "Ann", "LAL", "Us", c(1, 1, 1), slot = "IR"))
+  df_base <- fake_h2h_base(roster, days)
+  tbl <- table_data_prep(df_base, NULL, no_grey_players(), days[1])
+  labels <- format(days, "%a (%d/%m)")
+
+  expect_equal(tbl[[labels[1]]], "1b")
+})
+
+test_that("the injury marker wins over the bench marker", {
+  days <- cur_date - 3:1
+  roster <- list(
+    fake_player(1, "Ann", "LAL", "Us", c(1, 1, 1), inj_status = "Out", slot = "BE")
+  )
+  df_base <- fake_h2h_base(roster, days)
+  tbl <- table_data_prep(df_base, NULL, no_grey_players(), days[1])
+  labels <- format(days, "%a (%d/%m)")
+
+  expect_equal(tbl[[labels[1]]], "1*")
+})
+
+test_that("a bench marker is not applied to a future day", {
+  days <- c(cur_date - 1, cur_date, cur_date + 1)
+  roster <- list(
+    fake_player(1, "Ann", "LAL", "Us", c(1, 1, 1), slot = "BE")
+  )
+  df_base <- fake_h2h_base(roster, days)
+  tbl <- table_data_prep(df_base, NULL, no_grey_players(), days[1])
+  labels <- format(days, "%a (%d/%m)")
+
+  expect_equal(tbl[[labels[1]]], "1b")
+  expect_equal(tbl[[labels[2]]], "1")
+  expect_equal(tbl[[labels[3]]], "1")
+})
+
+test_that("benched games are left out of games_remaining", {
+  days <- cur_date - 3:1
+  roster <- list(
+    fake_player(1, "Ann", "LAL", "Us", c(1, 1, 1)),
+    fake_player(2, "Bob", "BOS", "Us", c(1, 1, 1), slot = "BE")
+  )
+  df_base <- fake_h2h_base(roster, days, matchup_end = cur_date)
+  tbl <- table_data_prep(df_base, NULL, no_grey_players(), days[1])
+
+  expect_equal(pull(tbl, games_remaining, player_name), c(Ann = 3, Bob = 0))
+})

@@ -83,14 +83,40 @@ test_that("summary cells above the league's starter count are flagged", {
   expect_null(cell_style(col_fmt_player, labels[2], 11))
 })
 
+test_that("past summary cells are never flagged for exceeding the starter count", {
+  days <- cur_date - 3:1
+  df_base <- fake_h2h_base(h2h_test_roster(), days)
+  tbl <- table_data_prep(df_base, NULL, no_grey_players(), days[1])
+  labels <- format(days, "%a (%d/%m)")
+  col_dates <- col_dates_from_labels(names(tbl), min(df_base$matchup_start))
+
+  col_fmt_sum <- game_tbl_col_fmt(tbl, days[2], max(days), col_dates, type = "sum", starter_count = 2)
+
+  expect_null(cell_style(col_fmt_sum, labels[1], 3))
+})
+
+test_that("cells for a benched past game are blue", {
+  days <- cur_date - 3:1
+  roster <- list(
+    fake_player(1, "Ann", "LAL", "Us", c(1, 1, 1)),
+    fake_player(2, "Bob", "BOS", "Us", c(1, 1, 1), slot = "BE")
+  )
+  df_base <- fake_h2h_base(roster, days)
+  tbl <- table_data_prep(df_base, NULL, no_grey_players(), days[1])
+  labels <- format(days, "%a (%d/%m)")
+  col_fmt <- game_tbl_col_fmt(tbl, days[2], max(days), col_dates_from_labels(names(tbl), min(df_base$matchup_start)))
+
+  expect_equal(cell_style(col_fmt, labels[1], "1b", index = 2), bench_blue)
+  expect_null(cell_style(col_fmt, labels[1], "1", index = 1))
+})
+
 test_that("dates inside a player's grey intervals are shaded", {
   days <- cur_date + 0:3
   df_base <- fake_h2h_base(h2h_test_roster(), days)
   grey <- tibble(
     player_id = 1L,
     competitor_id = 1L,
-    grey_intervals = list(tibble(start = days[c(2, 4)], end = days[c(2, 4)])),
-    bench_intervals = list(tibble(start = as.Date(character()), end = as.Date(character())))
+    grey_intervals = list(tibble(start = days[c(2, 4)], end = days[c(2, 4)]))
   )
   tbl <- table_data_prep(df_base, NULL, grey, days[1])
   labels <- format(days, "%a (%d/%m)")
@@ -102,20 +128,17 @@ test_that("dates inside a player's grey intervals are shaded", {
   expect_equal(cell_style(col_fmt, labels[3], "1", index = 1), pin_yellow)
 })
 
-test_that("dates a player spent on the bench are shaded differently from absence", {
-  days <- cur_date + 0:3
+test_that("absence takes precedence over an injury flag", {
+  days <- cur_date + 0:2
   df_base <- fake_h2h_base(h2h_test_roster(), days)
-  bench <- tibble(
+  grey <- tibble(
     player_id = 1L,
     competitor_id = 1L,
-    grey_intervals = list(tibble(start = days[2], end = days[2])),
-    bench_intervals = list(tibble(start = days[3], end = days[3]))
+    grey_intervals = list(tibble(start = days[2], end = days[2]))
   )
-  tbl <- table_data_prep(df_base, NULL, bench, days[1])
+  tbl <- table_data_prep(df_base, NULL, grey, days[1])
   labels <- format(days, "%a (%d/%m)")
   col_fmt <- game_tbl_col_fmt(tbl, days[1], max(days), col_dates_from_labels(names(tbl), min(df_base$matchup_start)))
 
-  expect_equal(cell_style(col_fmt, labels[2], "1", index = 1), grey_shade)
-  expect_equal(cell_style(col_fmt, labels[3], "1", index = 1), bench_blue)
-  expect_null(cell_style(col_fmt, labels[4], "1", index = 1))
+  expect_equal(cell_style(col_fmt, labels[2], "1*", index = 1), grey_shade)
 })

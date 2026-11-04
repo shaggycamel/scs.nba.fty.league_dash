@@ -114,7 +114,6 @@ game_tbl_col_fmt <- function(df, dt, mup_end, col_dates, type = "player", starte
       header = tags$span(nm[1], tags$br(), nm[2]),
       style = function(value, index) {
         grey_intervals <- if ("grey_intervals" %in% names(df)) df$grey_intervals[[index]] else NULL
-        bench_intervals <- if ("bench_intervals" %in% names(df)) df$bench_intervals[[index]] else NULL
         if (
           type == "player" &&
             !is.null(grey_intervals) &&
@@ -122,16 +121,14 @@ game_tbl_col_fmt <- function(df, dt, mup_end, col_dates, type = "player", starte
             any(col_date >= grey_intervals$start & col_date <= grey_intervals$end)
         ) {
           list(background = "#d7d7d5", color = "#d7d7d5")
-        } else if (
-          type == "player" &&
-            !is.null(bench_intervals) &&
-            nrow(bench_intervals) > 0 &&
-            any(col_date >= bench_intervals$start & col_date <= bench_intervals$end)
-        ) {
+        } else if (str_detect(as.character(value), "\\*")) {
+          list(background = "#ea7878ff")
+        } else if (str_detect(as.character(value), "b")) {
           list(background = "#bcd7ee")
         } else if (
-          str_detect(as.character(value), "\\*") ||
-            (type == "sum" && isTRUE(as.numeric(str_remove(value, "\\*")) > starter_count))
+          type == "sum" &&
+            col_date >= cur_date &&
+            isTRUE(as.numeric(value) > starter_count)
         ) {
           list(background = "#ea7878ff")
         } else if (col_date == dt) {
@@ -148,7 +145,7 @@ game_tbl_col_fmt <- function(df, dt, mup_end, col_dates, type = "player", starte
     header = tags$span("Games", tags$br(), "Remaining"),
     style = list(background = "#96e5cbeb")
   )
-  for (nm in c("grey_intervals", "bench_intervals", "competitor_id", "competitor", "player_id")) {
+  for (nm in c("grey_intervals", "competitor_id", "competitor", "player_id")) {
     if (nm %in% names(df)) {
       col_fmt[[nm]] <- colDef(show = FALSE)
     }

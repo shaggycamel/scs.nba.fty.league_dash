@@ -84,3 +84,50 @@ test_that("a day under the lineup-spot cap keeps its own count", {
     c(Us = 2)
   )
 })
+
+test_that("past daily totals are capped at the lineup spots", {
+  days <- cur_date - 2:1
+  capped_roster <- list(
+    fake_player(1, "Ann", "LAL", "Us", c(1, 1)),
+    fake_player(2, "Bob", "BOS", "Us", c(1, 1)),
+    fake_player(3, "Cyd", "NYK", "Us", c(1, 1))
+  )
+  capped_base <- fake_h2h_base(capped_roster, days)
+  capped_tbl <- table_data_prep(capped_base, NULL, no_grey_players(), days[1])
+
+  sums <- table_sum_data_prep(capped_tbl, capped_base, days[1], 2)
+
+  labels <- format(days, "%a (%d/%m)")
+  expect_equal(unname(unlist(select(sums, all_of(labels)))), c(2, 2))
+})
+
+test_that("a benched past game is left out of the team total", {
+  days <- cur_date - 2:1
+  bench_roster <- list(
+    fake_player(1, "Ann", "LAL", "Us", c(1, 1)),
+    fake_player(2, "Bob", "BOS", "Us", c(1, 1), slot = "BE")
+  )
+  bench_base <- fake_h2h_base(bench_roster, days)
+  bench_tbl <- table_data_prep(bench_base, NULL, no_grey_players(), days[1])
+
+  sums <- table_sum_data_prep(bench_tbl, bench_base, days[1], 10)
+
+  labels <- format(days, "%a (%d/%m)")
+  expect_equal(unname(unlist(select(sums, all_of(labels)))), c(1, 1))
+})
+
+test_that("future daily totals can exceed the lineup spots", {
+  days <- cur_date + 0:1
+  over_roster <- list(
+    fake_player(1, "Ann", "LAL", "Us", c(1, 1)),
+    fake_player(2, "Bob", "BOS", "Us", c(1, 1)),
+    fake_player(3, "Cyd", "NYK", "Us", c(1, 1))
+  )
+  over_base <- fake_h2h_base(over_roster, days)
+  over_tbl <- table_data_prep(over_base, NULL, no_grey_players(), days[1])
+
+  sums <- table_sum_data_prep(over_tbl, over_base, days[1], 2)
+
+  labels <- format(days, "%a (%d/%m)")
+  expect_equal(unname(unlist(select(sums, all_of(labels)))), c(3, 3))
+})

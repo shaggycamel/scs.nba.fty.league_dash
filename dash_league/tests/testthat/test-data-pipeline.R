@@ -148,6 +148,7 @@ test_that("a points league's h2h past totals reconcile with the official matchup
       !is.na(game_date),
       game_date <= matchup_end,
       matchup_start >= covered,
+      is_starting_lineup(lineup_slot),
       # A live matchup's official score is still moving, and its later games
       # have no box score yet, so only a closed one can be compared.
       matchup_end < pkg[["cur_date"]]

@@ -27,17 +27,17 @@ empty_grey <- function() {
   tibble(
     competitor_id = integer(),
     player_id = integer(),
-    grey_intervals = list(),
-    bench_intervals = list()
+    grey_intervals = list()
   )
 }
 
 
-alter_grey_intervals <- function(input, df_base, rv_carry_thru, rv_alter_team) {
-  applies <- isTRUE(
-    as.integer(input$matchup) >= rv_carry_thru$cur_matchup_period
-  )
+alter_applies <- function(input, rv_carry_thru) {
+  isTRUE(as.integer(input$matchup) >= rv_carry_thru$cur_matchup_period)
+}
 
+
+alter_grey_intervals <- function(input, df_base, rv_carry_thru, rv_alter_team) {
   added <- rv_alter_team |>
     keep(\(x) x$action == "add" && as.Date(x$action_date) >= cur_date) |>
     map_int("player_id")
@@ -52,7 +52,7 @@ alter_grey_intervals <- function(input, df_base, rv_carry_thru, rv_alter_team) {
     }) |>
     list_rbind()
 
-  if (!applies || nrow(ex) == 0) {
+  if (!alter_applies(input, rv_carry_thru) || nrow(ex) == 0) {
     return(empty_grey())
   }
 
@@ -81,13 +81,69 @@ alter_grey_intervals <- function(input, df_base, rv_carry_thru, rv_alter_team) {
       grey_intervals = map(
         start,
         \(s) tibble(start = s, end = as.Date("3000-01-01"))
-      ),
-      bench_intervals = map(
-        start,
-        \(s) tibble(start = as.Date(character()), end = as.Date(character()))
       )
     ) |>
-    select(competitor_id, player_id, grey_intervals, bench_intervals)
+    select(competitor_id, player_id, grey_intervals)
+}
+
+
+empty_adds <- function() {
+  tibble(player_id = integer(), action_date = as.Date(character()))
+}
+
+
+alter_team_adds <- function(rv_alter_team) {
+  adds <- rv_alter_team |>
+    keep(\(x) x$action == "add" && as.Date(x$action_date) >= cur_date) |>
+    map(\(x) {
+      tibble(
+        player_id = as.integer(x$player_id),
+        action_date = as.Date(x$action_date)
+      )
+    }) |>
+    list_rbind()
+
+  if (is.null(adds) || nrow(adds) == 0) {
+    return(empty_adds())
+  }
+
+  adds |>
+    summarise(action_date = min(action_date), .by = player_id)
+}
+
+
+add_grey_intervals <- function(input, df_base, rv_carry_thru, rv_alter_team, roster) {
+  if (!alter_applies(input, rv_carry_thru)) {
+    return(empty_grey())
+  }
+
+  add <- alter_team_adds(rv_alter_team)
+
+  if (nrow(add) == 0) {
+    return(empty_grey())
+  }
+
+  cp_id <- as.integer(rv_carry_thru$competitor_id)
+
+  rostered_here <- roster |>
+    filter(competitor_id == !!cp_id) |>
+    distinct(player_id) |>
+    pull(player_id)
+
+  matchup_start <- min(df_base$matchup_start, na.rm = TRUE)
+
+  add |>
+    filter(!player_id %in% rostered_here) |>
+    mutate(end = action_date - 1) |>
+    filter(end >= matchup_start) |>
+    mutate(
+      competitor_id = cp_id,
+      grey_intervals = map(
+        end,
+        \(e) tibble(start = matchup_start, end = e)
+      )
+    ) |>
+    select(competitor_id, player_id, grey_intervals)
 }
 
 
@@ -111,38 +167,65 @@ grey_player_data_prep <- function(input, df_base, rv_carry_thru, opponent, rv_al
       mutate(snapshot = seq_along(assigned_date), .by = competitor_id)
 
     roster_snapshots <- roster |>
-      distinct(competitor_id, player_id, assigned_date, lineup_slot) |>
-      mutate(active = is_starting_lineup(lineup_slot)) |>
+      distinct(competitor_id, player_id, assigned_date) |>
       inner_join(observed, by = join_by(competitor_id, assigned_date)) |>
-      select(competitor_id, player_id, snapshot, active)
+      mutate(rostered = TRUE) |>
+      select(competitor_id, player_id, snapshot, rostered)
 
     roster_snapshots |>
       distinct(competitor_id, player_id) |>
       inner_join(observed, by = join_by(competitor_id), relationship = "many-to-many") |>
       left_join(roster_snapshots, by = join_by(competitor_id, player_id, snapshot)) |>
-      mutate(rostered = !is.na(active), active = coalesce(active, FALSE)) |>
+      mutate(rostered = coalesce(rostered, FALSE)) |>
       arrange(competitor_id, player_id, snapshot) |>
       summarise(
         grey_intervals = list(
           intervals_from_runs(!rostered, assigned_date, matchup_start, tail(rostered, 1))
         ),
-        bench_intervals = list(
-          intervals_from_runs(rostered & !active, assigned_date, matchup_start, tail(rostered, 1))
-        ),
         .by = c(competitor_id, player_id)
       ) |>
-      filter(map_int(grey_intervals, nrow) > 0 | map_int(bench_intervals, nrow) > 0)
+      filter(map_int(grey_intervals, nrow) > 0)
+  }
+
+  add <- if (alter_applies(input, rv_carry_thru)) {
+    alter_team_adds(rv_alter_team)
+  } else {
+    empty_adds()
   }
 
   bind_rows(
     roster_grey,
-    alter_grey_intervals(input, df_base, rv_carry_thru, rv_alter_team)
+    alter_grey_intervals(input, df_base, rv_carry_thru, rv_alter_team),
+    add_grey_intervals(input, df_base, rv_carry_thru, rv_alter_team, roster)
   ) |>
     summarise(
       grey_intervals = list(distinct(bind_rows(grey_intervals))),
-      bench_intervals = list(distinct(bind_rows(bench_intervals))),
       .by = c(competitor_id, player_id)
     ) |>
+    (\(df) {
+      if (nrow(add) == 0) {
+        return(df)
+      }
+
+      df |>
+        left_join(
+          add |>
+            mutate(competitor_id = as.integer(rv_carry_thru$competitor_id)),
+          by = join_by(competitor_id, player_id)
+        ) |>
+        mutate(
+          grey_intervals = map2(grey_intervals, action_date, \(iv, d) {
+            if (is.na(d)) {
+              iv
+            } else {
+              iv |>
+                mutate(end = pmin(end, d - 1)) |>
+                filter(start <= end)
+            }
+          })
+        ) |>
+        select(-action_date)
+    })() |>
     inner_join(
       distinct(df_base, competitor_id, player_id),
       by = join_by(competitor_id, player_id)
@@ -151,20 +234,39 @@ grey_player_data_prep <- function(input, df_base, rv_carry_thru, opponent, rv_al
 
 
 table_data_prep <- function(df_base, rv_carry_thru, df_grey_player, pin_date, post_matchup_days = 2) {
+  if (!"lineup_slot" %in% names(df_base)) {
+    df_base$lineup_slot <- rep(NA_character_, nrow(df_base))
+  }
+
   df_wide <- df_base |>
     arrange(game_date) |>
-    select(competitor, competitor_id, player_team, player_id, player_name, inj_status, fmt_date, scheduled_to_play) |>
+    mutate(
+      benched = !is_starting_lineup(lineup_slot) &
+        !is.na(game_date) &
+        game_date < cur_date
+    ) |>
+    select(
+      competitor,
+      competitor_id,
+      player_team,
+      player_id,
+      player_name,
+      inj_status,
+      fmt_date,
+      scheduled_to_play,
+      benched
+    ) |>
     distinct() |>
     mutate(
       scheduled_to_play = as.character(replace_na(scheduled_to_play, 0)),
-      scheduled_to_play = if_else(
-        inj_status == "Out",
-        str_c(scheduled_to_play, "*"),
-        scheduled_to_play,
-        missing = scheduled_to_play
-      )
+      suffix = case_when(
+        inj_status == "Out" ~ "*",
+        benched ~ "b",
+        TRUE ~ ""
+      ),
+      scheduled_to_play = str_c(scheduled_to_play, suffix)
     ) |>
-    select(-inj_status) |>
+    select(-inj_status, -benched, -suffix) |>
     pivot_wider(
       names_from = fmt_date,
       values_from = scheduled_to_play,
@@ -202,7 +304,8 @@ table_data_prep <- function(df_base, rv_carry_thru, df_grey_player, pin_date, po
       games_remaining = if (cur_date > unique(na.omit(df_base$matchup_end))) {
         0
       } else {
-        sum(as.numeric(str_remove(c_across(all_of(remaining_cols)), "\\*")), na.rm = TRUE)
+        values <- c_across(all_of(remaining_cols))
+        sum(as.numeric(str_remove_all(values, "[*b]")) * !str_detect(values, "b"), na.rm = TRUE)
       },
       .before = if (all(is.na(df_base$matchup_end_plus))) last_col() else last_col(2)
     ) |>
@@ -215,7 +318,10 @@ table_sum_data_prep <- function(df_tbl, df_base, pin_date, starter_count) {
     summarise(
       across(
         contains("/"),
-        \(x) sum(as.numeric(str_remove(x, "\\*")) * !str_detect(x, "\\*"), na.rm = TRUE)
+        \(x) {
+          games <- as.numeric(str_remove_all(x, "[*b]"))
+          sum(games * !str_detect(x, "[*b]"), na.rm = TRUE)
+        }
       ),
       .by = competitor
     ) |>
@@ -227,6 +333,14 @@ table_sum_data_prep <- function(df_tbl, df_base, pin_date, starter_count) {
   # carry through the summarise and no further filling is needed here.
   matchup_start <- min(df_base$matchup_start, na.rm = TRUE)
   col_dates <- col_dates_from_labels(names(df_sum), matchup_start)
+
+  # The active spots are a ceiling on what a past day could have scored, and
+  # lineup slots are missing for older snapshots, so cap once the day is done.
+  # Looking forward the count can run over, and is flagged rather than capped.
+  past_cols <- names(col_dates)[col_dates < cur_date]
+  df_sum <- df_sum |>
+    mutate(across(all_of(past_cols), \(x) pmin(x, starter_count)))
+
   remaining_cols <- pin_columns(
     col_dates,
     pin_date,
@@ -247,10 +361,7 @@ table_sum_data_prep <- function(df_tbl, df_base, pin_date, starter_count) {
       .before = if (all(is.na(df_base$matchup_end_plus))) last_col() else last_col(2)
     ) |>
     ungroup() |>
-    mutate(
-      grey_intervals = vector("list", length(player_team)),
-      bench_intervals = vector("list", length(player_team))
-    )
+    mutate(grey_intervals = vector("list", length(player_team)))
 }
 
 

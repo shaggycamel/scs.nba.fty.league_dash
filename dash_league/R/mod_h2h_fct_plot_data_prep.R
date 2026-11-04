@@ -1,4 +1,8 @@
 plot_data_prep <- function(df_base, rv_carry_thru) {
+  if ("lineup_slot" %in% names(df_base)) {
+    df_base <- filter(df_base, is_starting_lineup(lineup_slot))
+  }
+
   if ("excluded" %in% names(df_base)) {
     df_base <- filter(df_base, !coalesce(excluded, FALSE))
   }

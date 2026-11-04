@@ -146,7 +146,7 @@ test_that("every built league has free-agent future games", {
   }
 })
 
-test_that("h2h past rows all trace to a starting slot on the competitor's roster", {
+test_that("h2h past rows all trace to a roster spot on the competitor's roster", {
   pkg <- as.environment("package:league")
   needed <- c("dfs_h2h_past", "dfs_fty_roster")
   skip_if_not(all(rlang::env_has(pkg, needed)), "package data not built")
@@ -162,7 +162,6 @@ test_that("h2h past rows all trace to a starting slot on the competitor's roster
   roster <- pkg[["dfs_fty_roster"]] |>
     purrr::list_rbind(names_to = "league_id") |>
     dplyr::mutate(league_id = as.integer(league_id)) |>
-    dplyr::filter(is_starting_lineup(lineup_slot)) |>
     dplyr::select(league_id, competitor_id, player_id, assigned_date)
 
   unmatched <- dplyr::anti_join(
