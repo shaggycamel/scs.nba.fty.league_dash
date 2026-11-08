@@ -47,7 +47,7 @@ df_nba_schedule <-
   select(game_date) |>
   left_join(
     tbl(db_con, I("nba.schedule_vw")) |>
-      filter(season == cur_season, season_type == 'Regular Season') |>
+      filter(season == cur_season, season_type == "Regular Season") |>
       as_tibble(),
     by = join_by(game_date)
   ) |>

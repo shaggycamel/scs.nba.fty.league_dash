@@ -23,4 +23,3 @@ test_that("an unknown lineup slot counts as starting", {
   expect_true(is_starting_lineup(NA_character_))
   expect_equal(is_starting_lineup(c(NA, "BE", "C")), c(TRUE, FALSE, TRUE))
 })
-

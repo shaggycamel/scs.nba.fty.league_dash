@@ -469,7 +469,8 @@ mod_h2h_server <- function(
           league_id == as.integer(rv_carry_thru$league_id),
           !is.na(points)
         ) |>
-        nrow() > 0
+        nrow() >
+        0
     })
 
     plot_expanded <- reactive({
@@ -549,8 +550,12 @@ mod_h2h_server <- function(
       col_dates <- col_dates_from_labels(names(df_tbl()), min(df_base()$matchup_start, na.rm = TRUE))
 
       col_fmt_sum <- game_tbl_col_fmt(
-        df_tbl_sum(), input$pin_date, mup_end, col_dates,
-        type = "sum", starter_count = starter_count()
+        df_tbl_sum(),
+        input$pin_date,
+        mup_end,
+        col_dates,
+        type = "sum",
+        starter_count = starter_count()
       )
 
       htmlwidgets::onRender(
@@ -568,7 +573,10 @@ mod_h2h_server <- function(
           details = \(ix) {
             df_details <- filter(df_tbl(), competitor == df_tbl_sum()$player_team[ix])
             col_fmt <- game_tbl_col_fmt(
-              df_details, input$pin_date, mup_end, col_dates,
+              df_details,
+              input$pin_date,
+              mup_end,
+              col_dates,
               starter_count = starter_count()
             )
 

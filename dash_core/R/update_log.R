@@ -44,9 +44,7 @@ update_log_row <- function(
   } else {
     as.character(error[[1L]])
   }
-  error_message <- if (
-    length(error_chr) == 1L && !is.na(error_chr) && nzchar(error_chr)
-  ) {
+  error_message <- if (length(error_chr) == 1L && !is.na(error_chr) && nzchar(error_chr)) {
     error_chr
   } else {
     NA_character_
@@ -125,7 +123,10 @@ log_update <- function(
     },
     error = function(e) {
       warning(
-        "could not write util.update_log row for ", task, ": ", conditionMessage(e),
+        "could not write util.update_log row for ",
+        task,
+        ": ",
+        conditionMessage(e),
         call. = FALSE
       )
       FALSE

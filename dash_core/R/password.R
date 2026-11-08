@@ -15,8 +15,7 @@ raw_to_hex <- function(x) {
 }
 
 hex_to_raw <- function(s) {
-  if (is.null(s) || length(s) != 1L || is.na(s) || nchar(s) %% 2L != 0L ||
-        !grepl("^[0-9a-fA-F]*$", s)) {
+  if (is.null(s) || length(s) != 1L || is.na(s) || nchar(s) %% 2L != 0L || !grepl("^[0-9a-fA-F]*$", s)) {
     return(NULL)
   }
   if (!nzchar(s)) {
@@ -121,8 +120,14 @@ hash_password <- function(
 #' @return `TRUE` when the password matches, otherwise `FALSE`.
 #' @export
 verify_password <- function(password, hash) {
-  if (is.null(hash) || length(hash) != 1L || is.na(hash) || !nzchar(hash) ||
-        !is.character(password) || length(password) != 1L) {
+  if (
+    is.null(hash) ||
+      length(hash) != 1L ||
+      is.na(hash) ||
+      !nzchar(hash) ||
+      !is.character(password) ||
+      length(password) != 1L
+  ) {
     return(FALSE)
   }
 
@@ -134,8 +139,7 @@ verify_password <- function(password, hash) {
     iterations <- suppressWarnings(as.integer(parts[2]))
     salt <- hex_to_raw(parts[3])
     expected <- hex_to_raw(parts[4])
-    if (is.na(iterations) || iterations < 1L || is.null(salt) || is.null(expected) ||
-          length(expected) == 0L) {
+    if (is.na(iterations) || iterations < 1L || is.null(salt) || is.null(expected) || length(expected) == 0L) {
       return(FALSE)
     }
     actual <- pbkdf2_sha256(charToRaw(password), salt, iterations, length(expected))

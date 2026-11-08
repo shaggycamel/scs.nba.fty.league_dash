@@ -156,7 +156,11 @@ get_customer_leagues <- function(con, customer_id, season = entry_season()) {
      where table_schema = 'fty' and table_name = 'league'"
   )$column_name
   slug_expr <- if ("slug" %in% league_cols) "lg.slug::text as slug" else "null::text as slug"
-  url_expr <- if ("container_url" %in% league_cols) "lg.container_url::text as container_url" else "null::text as container_url"
+  url_expr <- if ("container_url" %in% league_cols) {
+    "lg.container_url::text as container_url"
+  } else {
+    "null::text as container_url"
+  }
   active_clause <- if ("is_active" %in% league_cols) "and coalesce(lg.is_active, true)" else ""
 
   DBI::dbGetQuery(

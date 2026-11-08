@@ -49,7 +49,9 @@ plot_data_prep <- function(df_base, rv_carry_thru) {
         category_rows <- weighted |>
           summarise(
             label = paste0(
-              "Total: ", round(sum(points_value, na.rm = TRUE), 1), "\n\n",
+              "Total: ",
+              round(sum(points_value, na.rm = TRUE), 1),
+              "\n\n",
               paste(str_c(player_name, ": ", round(points_value, 1)), collapse = "\n")
             ),
             value = sum(points_value, na.rm = TRUE),
@@ -65,7 +67,9 @@ plot_data_prep <- function(df_base, rv_carry_thru) {
           arrange(desc(points_value), player_name) |>
           summarise(
             label = paste0(
-              "Total: ", round(sum(points_value, na.rm = TRUE), 1), "\n\n",
+              "Total: ",
+              round(sum(points_value, na.rm = TRUE), 1),
+              "\n\n",
               paste(str_c(player_name, ": ", round(points_value, 1)), collapse = "\n")
             ),
             value = sum(points_value, na.rm = TRUE),
@@ -122,7 +126,10 @@ plot_data_prep <- function(df_base, rv_carry_thru) {
             )
         ) |>
           mutate(
-            name = ordered(name, c("reb", "blk", "stl", "tov", "ast", "pts", "fg3_m", "fg_pct", "ft_pct", "dd2", "td3")),
+            name = ordered(
+              name,
+              c("reb", "blk", "stl", "tov", "ast", "pts", "fg3_m", "fg_pct", "ft_pct", "dd2", "td3")
+            ),
             name = fct_drop(name),
             name_chr = as.character(name),
             is_overall = FALSE

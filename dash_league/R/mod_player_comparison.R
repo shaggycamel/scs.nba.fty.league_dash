@@ -34,7 +34,10 @@ mod_player_comparison_ui <- function(id) {
         radioButtons(ns("window"), "Rolling days", c(7, 15, 30), inline = TRUE),
         sliderInput(ns("minute_filter"), "Minute Filter", min = 0, max = 50, value = 10, round = TRUE)
       ),
-      card(full_screen = TRUE, shinycssloaders::withSpinner(reactableOutput(ns("comparison_table")), type = 1, color = "#133DEF")),
+      card(
+        full_screen = TRUE,
+        shinycssloaders::withSpinner(reactableOutput(ns("comparison_table")), type = 1, color = "#133DEF")
+      ),
       fillable = TRUE
     )
   )
@@ -207,7 +210,9 @@ mod_player_comparison_server <- function(id, rv_carry_thru, rv_copy_teams) {
       df <- df_comparison()
       show_fty_pts <- is_points_league() && "fty_pts" %in% names(df)
       stat_cols <- c("min", cats())
-      if (show_fty_pts) stat_cols <- c("fty_pts", stat_cols)
+      if (show_fty_pts) {
+        stat_cols <- c("fty_pts", stat_cols)
+      }
 
       df <- df |>
         select(

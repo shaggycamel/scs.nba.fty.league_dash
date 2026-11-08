@@ -55,8 +55,12 @@ test_that("entry app boots, logs in and builds a signed iframe", {
         src <- gsub("&amp;", "&", src, fixed = TRUE)
         params <- shiny::parseQueryString(sub("^[^?]*\\?", "", src))
         expect_true(core::verify_handoff_token(
-          params$sig, params$customer_id, params$platform, params$league_id,
-          params$competitor_id, params$exp
+          params$sig,
+          params$customer_id,
+          params$platform,
+          params$league_id,
+          params$competitor_id,
+          params$exp
         ))
       })
     }

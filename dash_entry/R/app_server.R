@@ -22,7 +22,9 @@ app_server <- function(input, output, session) {
 
   observeEvent(input$login, {
     shinycssloaders::showPageSpinner(
-      type = 6, color = "#133DEF", caption = "Signing in..."
+      type = 6,
+      color = "#133DEF",
+      caption = "Signing in..."
     )
 
     customer_id <- check_credentials(con, input$email, input$password)
@@ -106,8 +108,9 @@ app_server <- function(input, output, session) {
   # Prefer the registry container_url; fall back to the deploy naming convention.
   league_container_url <- reactive({
     row <- selected_league_row()
-    if (nrow(row) == 1L && !is.null(row$container_url) &&
-          !is.na(row$container_url[[1]]) && nzchar(row$container_url[[1]])) {
+    if (
+      nrow(row) == 1L && !is.null(row$container_url) && !is.na(row$container_url[[1]]) && nzchar(row$container_url[[1]])
+    ) {
       row$container_url[[1]]
     } else {
       league_space_url(rv$current_league$platform, rv$current_league$league_id)
@@ -144,12 +147,18 @@ app_server <- function(input, output, session) {
 
   # Show the spinner whenever a league is being loaded, hide it once the
   # embedded dashboard reports that it has loaded.
-  observeEvent(rv$current_league, {
-    req(rv$current_league)
-    shinycssloaders::showPageSpinner(
-      type = 6, color = "#133DEF", caption = "Loading league..."
-    )
-  }, ignoreNULL = TRUE)
+  observeEvent(
+    rv$current_league,
+    {
+      req(rv$current_league)
+      shinycssloaders::showPageSpinner(
+        type = 6,
+        color = "#133DEF",
+        caption = "Loading league..."
+      )
+    },
+    ignoreNULL = TRUE
+  )
 
   observeEvent(input$iframe_loaded, {
     shinycssloaders::hidePageSpinner()

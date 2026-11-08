@@ -1,13 +1,17 @@
 season_placeholder_text <- function(season = core::nba_season(), start = NULL) {
   if (is.null(start) || length(start) == 0 || is.na(start[[1]])) {
     return(paste0(
-      "The ", season, " NBA season has not started yet. ",
+      "The ",
+      season,
+      " NBA season has not started yet. ",
       "Standings and league trends will populate after the first completed matchups."
     ))
   }
 
   paste0(
-    "The ", season, " NBA regular season starts ",
+    "The ",
+    season,
+    " NBA regular season starts ",
     format(as.Date(start[[1]]), "%d %B %Y"),
     ". Standings and league trends will populate after the first completed matchups."
   )

@@ -42,10 +42,13 @@ test_that("a tampered signature is rejected", {
 })
 
 test_that("the wrong secret is rejected", {
-  with_secret({
-    sig <- sign_handoff_token("cus_1", "ESPN", 95537, 42, exp = future)
-    expect_false(verify_handoff_token(sig, "cus_1", "ESPN", 95537, 42, exp = future, secret = "other", now = now))
-  }, secret = "test-secret")
+  with_secret(
+    {
+      sig <- sign_handoff_token("cus_1", "ESPN", 95537, 42, exp = future)
+      expect_false(verify_handoff_token(sig, "cus_1", "ESPN", 95537, 42, exp = future, secret = "other", now = now))
+    },
+    secret = "test-secret"
+  )
 })
 
 test_that("handoff_query produces a verifiable query string", {
@@ -55,8 +58,13 @@ test_that("handoff_query produces a verifiable query string", {
     expect_equal(params$platform, "ESPN")
     expect_equal(params$competitor_id, "42")
     expect_true(verify_handoff_token(
-      params$sig, params$customer_id, params$platform, params$league_id,
-      params$competitor_id, params$exp, now = now
+      params$sig,
+      params$customer_id,
+      params$platform,
+      params$league_id,
+      params$competitor_id,
+      params$exp,
+      now = now
     ))
   })
 })

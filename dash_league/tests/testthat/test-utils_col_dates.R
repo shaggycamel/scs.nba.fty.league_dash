@@ -44,14 +44,37 @@ test_that("col_dates_from_labels handles days with no games", {
 })
 
 test_that("col_dates_from_labels copes with no date columns", {
-  expect_equal(col_dates_from_labels(c("Team", "Pin"), as.Date("2025-10-27")), set_names(as.Date(character()), character()))
+  expect_equal(
+    col_dates_from_labels(c("Team", "Pin"), as.Date("2025-10-27")),
+    set_names(as.Date(character()), character())
+  )
 })
 
 # The real shapes that broke the old positional arithmetic.
-matchup_1 <- c("Team", "Pin", "Tue (21/10)", "Wed (22/10)", "Thu (23/10)", "Fri (24/10)",
-               "Sat (25/10)", "Sun (26/10)", "Mon (27/10)", "Tue (28/10)")
-matchup_6 <- c("Team", "Pin", "Mon (24/11)", "Tue (25/11)", "Wed (26/11)", "Fri (28/11)",
-               "Sat (29/11)", "Sun (30/11)", "Mon (01/12)", "Tue (02/12)")
+matchup_1 <- c(
+  "Team",
+  "Pin",
+  "Tue (21/10)",
+  "Wed (22/10)",
+  "Thu (23/10)",
+  "Fri (24/10)",
+  "Sat (25/10)",
+  "Sun (26/10)",
+  "Mon (27/10)",
+  "Tue (28/10)"
+)
+matchup_6 <- c(
+  "Team",
+  "Pin",
+  "Mon (24/11)",
+  "Tue (25/11)",
+  "Wed (26/11)",
+  "Fri (28/11)",
+  "Sat (29/11)",
+  "Sun (30/11)",
+  "Mon (01/12)",
+  "Tue (02/12)"
+)
 
 test_that("pin_columns counts the pinned day through to the matchup end", {
   # Matchup 1 has no column for its first day, 20 Oct, because no games were on.
@@ -92,8 +115,20 @@ test_that("pin_columns looking back stops at the day before the pin", {
 })
 
 test_that("pin_columns spans the all-star break", {
-  all_star <- c("Team", "Pin", "Mon (09/02)", "Tue (10/02)", "Wed (11/02)", "Thu (12/02)",
-                "Thu (19/02)", "Fri (20/02)", "Sat (21/02)", "Sun (22/02)", "Mon (23/02)", "Tue (24/02)")
+  all_star <- c(
+    "Team",
+    "Pin",
+    "Mon (09/02)",
+    "Tue (10/02)",
+    "Wed (11/02)",
+    "Thu (12/02)",
+    "Thu (19/02)",
+    "Fri (20/02)",
+    "Sat (21/02)",
+    "Sun (22/02)",
+    "Mon (23/02)",
+    "Tue (24/02)"
+  )
   dts <- col_dates_from_labels(all_star, as.Date("2026-02-09"))
 
   # Looking back from the first day after the break: the four days before it.

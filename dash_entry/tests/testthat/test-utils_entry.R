@@ -43,14 +43,23 @@ test_that("league_iframe_url carries a verifiable handoff token", {
   now <- as.POSIXct("2020-01-01 00:00:00", tz = "UTC")
   url <- league_iframe_url(
     "https://example.hf.space",
-    customer_id = "ACME", platform = "ESPN", league_id = 95537, competitor_id = 42,
-    ttl = 300, now = now
+    customer_id = "ACME",
+    platform = "ESPN",
+    league_id = 95537,
+    competitor_id = 42,
+    ttl = 300,
+    now = now
   )
 
   expect_match(url, "^https://example\\.hf\\.space/\\?")
   params <- shiny::parseQueryString(sub("^[^?]*\\?", "", url))
   expect_true(core::verify_handoff_token(
-    params$sig, params$customer_id, params$platform, params$league_id,
-    params$competitor_id, params$exp, now = now
+    params$sig,
+    params$customer_id,
+    params$platform,
+    params$league_id,
+    params$competitor_id,
+    params$exp,
+    now = now
   ))
 })

@@ -248,8 +248,17 @@ dfs_fty_standings <-
     .by = c(league_id, division_id, division_name, wins, losses, pct)
   ) |>
   select(
-    league_id, rank, division_rank, division_id, division_name,
-    competitor_id, competitor_name, wins, losses, ties, pct,
+    league_id,
+    rank,
+    division_rank,
+    division_id,
+    division_name,
+    competitor_id,
+    competitor_name,
+    wins,
+    losses,
+    ties,
+    pct,
     any_of(c("points_for", "points_against"))
   ) |>
   nest_by(league_id) |>

@@ -1,5 +1,7 @@
 ensure_excluded <- function(df) {
-  if (!"excluded" %in% names(df)) df$excluded <- FALSE
+  if (!"excluded" %in% names(df)) {
+    df$excluded <- FALSE
+  }
   df$excluded <- coalesce(df$excluded, FALSE)
   df
 }
