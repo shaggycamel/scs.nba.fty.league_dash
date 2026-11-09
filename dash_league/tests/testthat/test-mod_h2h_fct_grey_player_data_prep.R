@@ -556,6 +556,56 @@ test_that("an add dated before today is ignored", {
   expect_false(99L %in% out$player_id)
 })
 
+test_that("an opponent's player is grey before the add for us and after it for them", {
+  added_base <- grey_fixtures()$df_base |>
+    tibble::add_row(
+      player_id = 20L,
+      competitor_id = 1L,
+      game_date = cur_date,
+      tense = "future",
+      matchup_start = cur_date - 3,
+      matchup_end = cur_date + 3
+    )
+  add <- list(list(
+    action = "add",
+    player_id = 20L,
+    action_date = as.character(cur_date)
+  ))
+  out <- grey_prep(
+    list(matchup = 5L),
+    added_base,
+    grey_rv(),
+    grey_opponent,
+    add
+  )
+
+  expect_equal(
+    grey_intervals(out, 20L, competitor_id = 1L),
+    tibble(start = cur_date - 3, end = cur_date - 1)
+  )
+  expect_equal(
+    grey_intervals(out, 20L, competitor_id = 2L),
+    tibble(start = cur_date, end = as.Date("3000-01-01"))
+  )
+})
+
+test_that("a third team's add does not grey the displayed opponent", {
+  add <- list(list(
+    action = "add",
+    player_id = 30L,
+    action_date = as.character(cur_date)
+  ))
+  out <- grey_prep(
+    list(matchup = 5L),
+    grey_fixtures()$df_base,
+    grey_rv(),
+    grey_opponent,
+    add
+  )
+
+  expect_false(30L %in% filter(out, competitor_id == 2L)$player_id)
+})
+
 test_that("an add only greys from the current matchup onward", {
   added_base <- grey_fixtures()$df_base |>
     tibble::add_row(

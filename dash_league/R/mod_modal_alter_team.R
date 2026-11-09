@@ -31,7 +31,12 @@ mod_modal_alter_team_server <- function(id, rv_alter_team, rv_alter_team_modal_v
           # tags$head(tags$style(HTML(".selectize-dropdown-content{min-width: 100%; box-sizing: border-box;}"))),
 
           # Select Action
-          switchInput(ns("add_or_exclude"), NULL, TRUE, "Add", "Exclude"),
+          layout_columns(
+            switchInput(ns("add_or_exclude"), NULL, TRUE, "Add", "Exclude"),
+            checkboxInput(ns("free_agent_filter"), "FA", value = TRUE),
+            col_widths = c(10, 2),
+            gap = "1px"
+          ),
 
           # Select Date
           dateInput(
@@ -44,7 +49,7 @@ mod_modal_alter_team_server <- function(id, rv_alter_team, rv_alter_team_modal_v
           ),
 
           # Select Player
-          selectizeInput(ns("player"), NULL, choices = character(0)),
+          selectizeInput(ns("player"), NULL, choices = character(0), multiple = TRUE),
 
           # Footer
           footer = tagList(
@@ -71,39 +76,64 @@ mod_modal_alter_team_server <- function(id, rv_alter_team, rv_alter_team_modal_v
 
     # Reactive player list ---------------------------------------------------
 
+    add_choices <- reactive({
+      if (isFALSE(input$free_agent_filter)) {
+        rv_alter_team_modal_vals$all_players
+      } else {
+        rv_alter_team_modal_vals$free_agents
+      }
+    })
+
     observe({
       updateSelectInput(
         inputId = "player",
         choices = if (input$add_or_exclude) {
-          rv_alter_team_modal_vals$free_agents
+          add_choices()
         } else {
           rv_alter_team_modal_vals$roster
         },
-        selected = NA
+        selected = character(0)
       )
     }) |>
       bindEvent(input$add_or_exclude, input$proceed, ignoreInit = TRUE)
 
+    observe({
+      req(input$add_or_exclude)
+      updateSelectInput(inputId = "player", choices = add_choices(), selected = character(0))
+    }) |>
+      bindEvent(input$free_agent_filter, ignoreInit = TRUE)
+
     # Proceed button ---------------------------------------------------------
 
     observe({
-      if (input$player != "") {
+      selected_ids <- input$player
+      selected_ids <- selected_ids[selected_ids != ""]
+
+      if (length(selected_ids) > 0) {
         current <- rv_alter_team()
 
-        player_name <- if (input$add_or_exclude) {
-          names(keep(rv_alter_team_modal_vals$free_agents, \(x) x == input$player))
+        choices <- if (input$add_or_exclude) {
+          add_choices()
         } else {
-          names(keep(rv_alter_team_modal_vals$roster, \(x) x == input$player))
+          rv_alter_team_modal_vals$roster
         }
 
-        key <- paste0(if (input$add_or_exclude) "add-" else "ex-", player_name)
+        selected <- choices[choices %in% selected_ids]
 
-        current[[key]] <- lst(
-          action = if (input$add_or_exclude) "add" else "ex",
-          action_date = as.character(input$action_date),
-          player_id = as.integer(input$player),
-          player_name = player_name
-        )
+        if (length(selected) == 0) {
+          output$message <- renderText("Select a player...")
+          return()
+        }
+
+        keys <- paste0(if (input$add_or_exclude) "add-" else "ex-", names(selected))
+        current[keys] <- map2(selected, names(selected), \(id, nm) {
+          lst(
+            action = if (input$add_or_exclude) "add" else "ex",
+            action_date = as.character(input$action_date),
+            player_id = as.integer(id),
+            player_name = nm
+          )
+        })
 
         rv_alter_team(current)
         removeModal()

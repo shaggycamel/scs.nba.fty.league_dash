@@ -177,6 +177,34 @@ mod_h2h_server <- function(
         na.omit() |>
         deframe()
 
+      l_id <- as.character(rv_carry_thru$league_id)
+
+      active_roster <- dfs_fty_roster |>
+        pluck(l_id) |>
+        filter(competitor_id == as.integer(rv_carry_thru$competitor_id)) |>
+        slice_max(assigned_date) |>
+        distinct(player_id)
+
+      future_players <- dfs_h2h_future |>
+        pluck(l_id) |>
+        map(\(mp) {
+          mp |>
+            map(\(cp) pluck(cp, "7")) |>
+            compact() |>
+            list_rbind()
+        }) |>
+        compact() |>
+        list_rbind() |>
+        distinct(player_id, player_name)
+
+      rv_alter_team_modal_vals$all_players <- dfs_player_comparison |>
+        pluck(l_id, "7") |>
+        filter(player_id %in% future_players$player_id) |>
+        anti_join(active_roster, by = join_by(player_id)) |>
+        arrange(desc(min)) |>
+        distinct(player_name, player_id) |>
+        deframe()
+
       rv_alter_team_modal_vals$ui_date <- input$pin_date
       rv_alter_team_modal_vals$mup_end_date <- unique(df_base()$matchup_end)
 
@@ -192,8 +220,8 @@ mod_h2h_server <- function(
 
       df <- tibble(
         key = selected_players,
-        action = str_split_i(selected_players, "-", 1),
-        player_name = str_split_i(selected_players, "-", 2),
+        action = if_else(str_detect(selected_players, "^add-"), "add", "ex"),
+        player_name = str_remove(selected_players, "^(add|ex)-"),
         delete = na_lgl
       )
 

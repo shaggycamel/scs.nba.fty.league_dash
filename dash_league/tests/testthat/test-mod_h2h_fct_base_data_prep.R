@@ -47,6 +47,17 @@ base_fixtures <- function() {
               matchup_start = cur_date - 1,
               matchup_end = cur_date + 3
             )
+          ),
+          # A third team, for adds that do not involve the displayed opponent.
+          "3" = list(
+            "7" = tibble(
+              player_id = 40L,
+              game_date = cur_date + 2,
+              pts = 8,
+              scheduled_to_play = 1,
+              matchup_start = cur_date - 1,
+              matchup_end = cur_date + 3
+            )
           )
         ),
         "6" = list(
@@ -87,6 +98,14 @@ base_fixtures <- function() {
         )
       )
     ),
+    # A third team that is not part of the displayed matchup.
+    roster = list(
+      "1" = tibble(
+        player_id = c(10L, 11L, 20L, 40L),
+        competitor_id = c(1L, 1L, 2L, 3L),
+        assigned_date = as.Date(rep(cur_date - 1, 4))
+      )
+    ),
     lookup = list(cp_id_to_name = list("1" = c("1" = "Me", "2" = "Rival")))
   )
 }
@@ -108,6 +127,7 @@ base_prep <- function(input, rv_carry_thru, opponent, rv_alter_team) {
   local_pkg_data(
     dfs_h2h_past = fixtures$past,
     dfs_h2h_future = fixtures$future,
+    dfs_fty_roster = fixtures$roster,
     ls_fty_lookup = fixtures$lookup
   )
   base_data_prep(input, rv_carry_thru, opponent, rv_alter_team)
@@ -221,6 +241,52 @@ test_that("an add persists into later matchups without earlier games leaking in"
   expect_equal(fa$game_date, cur_date + 10)
   expect_equal(fa$matchup_start, cur_date + 7)
   expect_true(all(fa$game_date >= fa$matchup_start))
+})
+
+test_that("an add takes a rostered opponent from the opponent's side", {
+  moves <- list(list(
+    action = "add",
+    player_id = 20L,
+    action_date = as.character(cur_date)
+  ))
+  out <- base_prep(base_input(), base_rv(), base_opponent(), moves)
+
+  mine <- filter(out, competitor == "Me", player_id == 20L)
+  rival <- filter(out, competitor == "Rival", player_id == 20L)
+
+  expect_equal(nrow(mine), 1L)
+  expect_false(mine$excluded)
+  expect_true(rival$excluded)
+  expect_equal(rival$scheduled_to_play, 0)
+})
+
+test_that("an add from a third team leaves the opponent untouched", {
+  moves <- list(list(
+    action = "add",
+    player_id = 40L,
+    action_date = as.character(cur_date)
+  ))
+  out <- base_prep(base_input(), base_rv(), base_opponent(), moves)
+
+  expect_true(40L %in% filter(out, competitor == "Me")$player_id)
+  expect_false(any(filter(out, competitor == "Rival")$excluded))
+})
+
+test_that("a rostered add works in a later matchup as well", {
+  input <- base_input()
+  input$matchup <- "6"
+  moves <- list(list(
+    action = "add",
+    player_id = 20L,
+    action_date = as.character(cur_date)
+  ))
+  out <- base_prep(input, base_rv(), base_opponent(), moves)
+
+  mine <- filter(out, competitor == "Me", player_id == 20L)
+  rival <- filter(out, competitor == "Rival", player_id == 20L)
+
+  expect_equal(mine$game_date, cur_date + 8)
+  expect_true(rival$excluded)
 })
 
 test_that("a move dated before today has already been applied and is ignored", {
