@@ -7,6 +7,46 @@ ensure_excluded <- function(df) {
 }
 
 
+# Who owned each added player on the day the move was made. A trade during the
+# matchup is attributed to the roster the player was on at the time.
+alter_team_add_owner <- function(l_id, add) {
+  if (is.null(add) || nrow(add) == 0) {
+    return(tibble(player_id = integer(), competitor_id = integer()))
+  }
+
+  roster <- pluck(dfs_fty_roster, l_id)
+  if (is.null(roster)) {
+    return(tibble(player_id = integer(), competitor_id = integer()))
+  }
+
+  roster |>
+    inner_join(add, by = join_by(player_id)) |>
+    filter(assigned_date <= action_date) |>
+    slice_max(assigned_date, by = player_id) |>
+    distinct(player_id, competitor_id)
+}
+
+
+# Any player who has future games, whether they are on a roster or a free agent.
+future_add_source <- function(l_id, matchup, window) {
+  buckets <- pluck(dfs_h2h_future, l_id, matchup)
+
+  rostered <- if (is.null(buckets)) {
+    NULL
+  } else {
+    buckets[names(buckets) != "free_agent"] |>
+      map(\(cp) pluck(cp, window)) |>
+      compact() |>
+      list_rbind()
+  }
+
+  bind_rows(
+    rostered,
+    pluck(dfs_h2h_future, l_id, "free_agent", "free_agent", window)
+  )
+}
+
+
 base_data_prep <- function(input, rv_carry_thru, opponent, rv_alter_team) {
   if (length(rv_alter_team) > 0) {
     df_alter <- tibble(
@@ -23,6 +63,9 @@ base_data_prep <- function(input, rv_carry_thru, opponent, rv_alter_team) {
   }
 
   l_id <- as.character(rv_carry_thru$league_id)
+
+  add_owner <- alter_team_add_owner(l_id, add)
+
   map(na.omit(as.character(c(opponent()$id, rv_carry_thru$competitor_id))), \(x) {
     bind_rows(
       compact(
@@ -37,7 +80,34 @@ base_data_prep <- function(input, rv_carry_thru, opponent, rv_alter_team) {
             x != rv_carry_thru$competitor_id |
               as.integer(input$matchup) < rv_carry_thru$cur_matchup_period
           ) {
-            pluck(dfs_h2h_future, l_id, input$matchup, x, input$window)
+            df <- pluck(dfs_h2h_future, l_id, input$matchup, x, input$window)
+
+            if (
+              !is.null(df) &&
+                nrow(df) > 0 &&
+                alter_applies(input, rv_carry_thru) &&
+                nrow(add_owner) > 0
+            ) {
+              owner_add <- add_owner |>
+                filter(as.character(competitor_id) == x) |>
+                inner_join(add, by = join_by(player_id))
+
+              if (nrow(owner_add) > 0) {
+                add_rows <- df |>
+                  inner_join(
+                    owner_add |> summarise(action_date = min(action_date), .by = player_id),
+                    by = join_by(player_id, game_date >= action_date)
+                  ) |>
+                  mutate(excluded = TRUE, scheduled_to_play = 0) |>
+                  select(-action_date)
+
+                df <- df |>
+                  anti_join(owner_add, by = join_by(player_id, game_date >= action_date)) |>
+                  bind_rows(add_rows)
+              }
+            }
+
+            df
           } else {
             pluck(dfs_h2h_future, l_id, input$matchup, x, input$window) |>
               (\(df) {
@@ -66,8 +136,7 @@ base_data_prep <- function(input, rv_carry_thru, opponent, rv_alter_team) {
 
                   df <- df |>
                     bind_rows(
-                      dfs_h2h_future |>
-                        pluck(l_id, "free_agent", "free_agent", input$window) |>
+                      future_add_source(l_id, input$matchup, input$window) |>
                         inner_join(add, by = join_by(player_id, game_date >= action_date)) |>
                         filter(game_date >= current_start, game_date <= current_end + 2) |>
                         mutate(

@@ -36,3 +36,112 @@ test_that("module ui works", {
     expect_true(i %in% names(fmls))
   }
 })
+
+test_that("an add with FA unticked uses the full player list", {
+  rv_alter_team <- reactiveVal(list())
+  modal_vals <- reactiveValues(
+    ui_date = Sys.Date(),
+    mup_end_date = Sys.Date() + 6,
+    free_agents = c("FA One" = 1L),
+    all_players = c("FA One" = 1L, "Rival Guy" = 2L),
+    roster = c("Mine" = 3L)
+  )
+  trigger <- reactiveVal(0L)
+
+  testServer(
+    mod_modal_alter_team_server,
+    args = list(
+      rv_alter_team = rv_alter_team,
+      rv_alter_team_modal_vals = modal_vals,
+      rv_alter_team_trigger = trigger
+    ),
+    {
+      trigger(1L)
+      session$setInputs(
+        add_or_exclude = TRUE,
+        free_agent_filter = FALSE,
+        action_date = Sys.Date(),
+        player = "2"
+      )
+      session$setInputs(proceed = 1)
+
+      expect_equal(names(rv_alter_team()), "add-Rival Guy")
+      expect_equal(rv_alter_team()[["add-Rival Guy"]]$player_id, 2L)
+    }
+  )
+})
+
+test_that("an add with FA ticked keeps the free-agent list", {
+  rv_alter_team <- reactiveVal(list())
+  modal_vals <- reactiveValues(
+    ui_date = Sys.Date(),
+    mup_end_date = Sys.Date() + 6,
+    free_agents = c("FA One" = 1L),
+    all_players = c("FA One" = 1L, "Rival Guy" = 2L),
+    roster = c("Mine" = 3L)
+  )
+  trigger <- reactiveVal(0L)
+
+  testServer(
+    mod_modal_alter_team_server,
+    args = list(
+      rv_alter_team = rv_alter_team,
+      rv_alter_team_modal_vals = modal_vals,
+      rv_alter_team_trigger = trigger
+    ),
+    {
+      trigger(1L)
+      session$setInputs(
+        add_or_exclude = TRUE,
+        free_agent_filter = TRUE,
+        action_date = Sys.Date(),
+        player = "1"
+      )
+      session$setInputs(proceed = 1)
+
+      expect_equal(names(rv_alter_team()), "add-FA One")
+    }
+  )
+})
+
+test_that("several players can be added or excluded in one go", {
+  rv_alter_team <- reactiveVal(list())
+  modal_vals <- reactiveValues(
+    ui_date = Sys.Date(),
+    mup_end_date = Sys.Date() + 6,
+    free_agents = c("FA One" = 1L),
+    all_players = c("FA One" = 1L, "Rival Guy" = 2L),
+    roster = c("Mine" = 3L, "Other" = 4L)
+  )
+  trigger <- reactiveVal(0L)
+
+  testServer(
+    mod_modal_alter_team_server,
+    args = list(
+      rv_alter_team = rv_alter_team,
+      rv_alter_team_modal_vals = modal_vals,
+      rv_alter_team_trigger = trigger
+    ),
+    {
+      trigger(1L)
+      session$setInputs(
+        add_or_exclude = TRUE,
+        free_agent_filter = FALSE,
+        action_date = Sys.Date(),
+        player = c("1", "2")
+      )
+      session$setInputs(proceed = 1)
+
+      expect_setequal(names(rv_alter_team()), c("add-FA One", "add-Rival Guy"))
+
+      session$setInputs(add_or_exclude = FALSE)
+      session$setInputs(player = c("3", "4"))
+      session$setInputs(proceed = 2)
+
+      expect_setequal(
+        names(rv_alter_team()),
+        c("add-FA One", "add-Rival Guy", "ex-Mine", "ex-Other")
+      )
+    }
+  )
+})

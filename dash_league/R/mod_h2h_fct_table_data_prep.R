@@ -147,6 +147,31 @@ add_grey_intervals <- function(input, df_base, rv_carry_thru, rv_alter_team, ros
 }
 
 
+# A player added from another team leaves that team on the action date.
+add_owner_grey_intervals <- function(input, df_base, rv_carry_thru, add) {
+  if (!alter_applies(input, rv_carry_thru) || nrow(add) == 0) {
+    return(empty_grey())
+  }
+
+  cp_id <- as.integer(rv_carry_thru$competitor_id)
+
+  shown_opponents <- df_base |>
+    filter(competitor_id != cp_id) |>
+    distinct(competitor_id)
+
+  alter_team_add_owner(as.character(rv_carry_thru$league_id), add) |>
+    inner_join(shown_opponents, by = join_by(competitor_id)) |>
+    inner_join(add, by = join_by(player_id)) |>
+    mutate(
+      grey_intervals = map(
+        action_date,
+        \(d) tibble(start = d, end = as.Date("3000-01-01"))
+      )
+    ) |>
+    select(competitor_id, player_id, grey_intervals)
+}
+
+
 grey_player_data_prep <- function(input, df_base, rv_carry_thru, opponent, rv_alter_team) {
   roster <- pluck(dfs_fty_roster, as.character(rv_carry_thru$league_id)) |>
     filter(
@@ -196,7 +221,8 @@ grey_player_data_prep <- function(input, df_base, rv_carry_thru, opponent, rv_al
   bind_rows(
     roster_grey,
     alter_grey_intervals(input, df_base, rv_carry_thru, rv_alter_team),
-    add_grey_intervals(input, df_base, rv_carry_thru, rv_alter_team, roster)
+    add_grey_intervals(input, df_base, rv_carry_thru, rv_alter_team, roster),
+    add_owner_grey_intervals(input, df_base, rv_carry_thru, add)
   ) |>
     summarise(
       grey_intervals = list(distinct(bind_rows(grey_intervals))),

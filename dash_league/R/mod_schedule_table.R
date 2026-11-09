@@ -12,7 +12,7 @@ mod_schedule_table_ui <- function(id) {
     layout_sidebar(
       sidebar = sidebar(
         selectInput(ns("matchup_selection"), "Matchup", choices = character(0), selectize = FALSE),
-        dateInput(ns("pin_date"), "Pinned Date"),
+        dateInput(ns("pin_date"), "Pinned Date", weekstart = 1),
         radioButtons(ns("pin_dir"), label = "Pin Direction", choices = c("-", "+"), selected = "+", inline = TRUE),
         actionButton(ns("copy_teams"), "Copy teams to Comparison")
       ),
