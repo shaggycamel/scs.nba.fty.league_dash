@@ -134,6 +134,14 @@ hf_apply_space_config() {
     echo "[hf] setting NBA_REQUIRE_HANDOFF on ${repo}"
     hf_space_set_variable "$repo" NBA_REQUIRE_HANDOFF 1 || return 1
   fi
+  if [ "$role" = "league" ]; then
+    local entry_url
+    entry_url="${NBA_ENTRY_URL:-https://${HF_OWNER}-${ENTRY_SLUG:-entry}.hf.space}"
+    if [ "$(hf_space_variable_value "$repo" NBA_ENTRY_URL)" != "$entry_url" ]; then
+      echo "[hf] setting NBA_ENTRY_URL on ${repo}"
+      hf_space_set_variable "$repo" NBA_ENTRY_URL "$entry_url" || return 1
+    fi
+  fi
 }
 
 hf_cleanup_legacy_vars() {

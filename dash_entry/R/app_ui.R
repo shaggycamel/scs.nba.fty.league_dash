@@ -63,11 +63,16 @@ app_ui <- function(request) {
       )),
       tags$script(HTML(
         "(function () {
-           function ping(url, options) {
-             fetch(url, options).catch(function () {});
+           var THROTTLE_MS = 30000;
+           var lastPing = 0;
+           function ping(url) {
+             fetch(url + '/?heartbeat=' + Date.now(), { mode: 'no-cors', cache: 'no-store' }).catch(function () {});
            }
-           function nbaHeartbeat() {
-             ping('./?heartbeat=' + Date.now(), { cache: 'no-store' });
+           function beat(force) {
+             var now = Date.now();
+             if (!force && now - lastPing < THROTTLE_MS) return;
+             lastPing = now;
+             ping(location.origin);
              var frame = document.getElementById('league_frame');
              if (!frame || !frame.src) return;
              var origin;
@@ -76,16 +81,14 @@ app_ui <- function(request) {
              } catch (e) {
                return;
              }
-             if (origin.indexOf('https://') !== 0 && origin.indexOf('http://') !== 0) return;
-             ping(origin + '/?heartbeat=' + Date.now(), { mode: 'no-cors', cache: 'no-store' });
+             if (origin === 'null' || origin === location.origin) return;
+             ping(origin);
            }
-           window.nbaHeartbeat = nbaHeartbeat;
-           nbaHeartbeat();
-           setInterval(nbaHeartbeat, 60000);
-           document.addEventListener('visibilitychange', function () {
-             if (!document.hidden) nbaHeartbeat();
+           window.nbaHeartbeat = function () { beat(true); };
+           ['pointerdown', 'keydown', 'scroll', 'touchstart', 'pointermove'].forEach(function (name) {
+             document.addEventListener(name, function () { beat(false); }, { passive: true, capture: true });
            });
-           window.addEventListener('pageshow', nbaHeartbeat);
+           beat(true);
          })();"
       ))
     ),

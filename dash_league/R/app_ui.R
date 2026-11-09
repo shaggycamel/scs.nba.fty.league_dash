@@ -10,8 +10,9 @@ app_ui <- function(request) {
   tagList(
     golem_add_external_resources(),
     useShinyjs(),
-    tags$head(tags$style(HTML(
-      "/* Let d3 outputs fill their fillable card even when wrapped by {shinycssloaders}. */
+    tags$head(
+      tags$style(HTML(
+        "/* Let d3 outputs fill their fillable card even when wrapped by {shinycssloaders}. */
        .card-body > .shiny-spinner-output-container {
          flex: 1 1 auto; min-height: 0;
          display: flex; flex-direction: column;
@@ -31,7 +32,38 @@ app_ui <- function(request) {
          font-size: 0.7rem; font-weight: 400; opacity: 0.85;
          margin-left: 2rem; white-space: nowrap;
        }"
-    ))),
+      )),
+      tags$script(HTML(sprintf(
+        "window.NBA_ENTRY_ORIGIN = %s;",
+        jsonlite::toJSON(sub("/+$", "", Sys.getenv("NBA_ENTRY_URL")), auto_unbox = TRUE)
+      ))),
+      tags$script(HTML(
+        "(function () {
+           var THROTTLE_MS = 30000;
+           var lastPing = 0;
+           function ping(url) {
+             fetch(url + '/?heartbeat=' + Date.now(), { mode: 'no-cors', cache: 'no-store' }).catch(function () {});
+           }
+           function beat(force) {
+             var now = Date.now();
+             if (!force && now - lastPing < THROTTLE_MS) return;
+             lastPing = now;
+             ping(location.origin);
+             var entry = '';
+             try {
+               entry = window.NBA_ENTRY_ORIGIN ? new URL(window.NBA_ENTRY_ORIGIN).origin : '';
+             } catch (e) {
+               entry = '';
+             }
+             if (entry && entry !== location.origin) ping(entry);
+           }
+           ['pointerdown', 'keydown', 'scroll', 'touchstart', 'pointermove'].forEach(function (name) {
+             document.addEventListener(name, function () { beat(false); }, { passive: true, capture: true });
+           });
+           beat(true);
+         })();"
+      ))
+    ),
     page_navbar(
       id = "title_container",
       window_title = "NBA Fantasy",

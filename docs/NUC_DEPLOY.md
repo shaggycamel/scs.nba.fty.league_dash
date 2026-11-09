@@ -203,7 +203,10 @@ sleep_time=300
 - Entry: ensures `NBA_HANDOFF_SECRET` only. The entry's `NBA_DB_HOST`,
   `NBA_DB_USER`, `NBA_DB_PASSWORD`, `NBA_DB_PORT`, and `NBA_DB_NAME` secrets are
   pre-existing and managed separately.
-- League Spaces: ensures `NBA_HANDOFF_SECRET` and `NBA_REQUIRE_HANDOFF=1`.
+- League Spaces: ensures `NBA_HANDOFF_SECRET`, `NBA_REQUIRE_HANDOFF=1`, and
+  `NBA_ENTRY_URL` (the entry point's public URL, used by the dashboard activity
+  heartbeat; defaults to `https://<owner>-entry.hf.space`, override with the
+  `NBA_ENTRY_URL` env var for a one-off run).
 - Never set `NBA_SEASON` or `NBA_DB_SECTION` on a Space; the season comes only
   from `core::nba_season()`.
 - Leagues found by `PROVISION=1` are created and configured automatically, using
