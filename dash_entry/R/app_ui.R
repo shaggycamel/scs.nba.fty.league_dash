@@ -62,9 +62,31 @@ app_ui <- function(request) {
          });"
       )),
       tags$script(HTML(
-        "setInterval(function () {
-           fetch('www/keepalive.txt?ts=' + Date.now(), { cache: 'no-store' }).catch(function () {});
-         }, 60000);"
+        "(function () {
+           function ping(url, options) {
+             fetch(url, options).catch(function () {});
+           }
+           function nbaHeartbeat() {
+             ping('./?heartbeat=' + Date.now(), { cache: 'no-store' });
+             var frame = document.getElementById('league_frame');
+             if (!frame || !frame.src) return;
+             var origin;
+             try {
+               origin = new URL(frame.src).origin;
+             } catch (e) {
+               return;
+             }
+             if (origin.indexOf('https://') !== 0 && origin.indexOf('http://') !== 0) return;
+             ping(origin + '/?heartbeat=' + Date.now(), { mode: 'no-cors', cache: 'no-store' });
+           }
+           window.nbaHeartbeat = nbaHeartbeat;
+           nbaHeartbeat();
+           setInterval(nbaHeartbeat, 60000);
+           document.addEventListener('visibilitychange', function () {
+             if (!document.hidden) nbaHeartbeat();
+           });
+           window.addEventListener('pageshow', nbaHeartbeat);
+         })();"
       ))
     ),
     uiOutput("app")

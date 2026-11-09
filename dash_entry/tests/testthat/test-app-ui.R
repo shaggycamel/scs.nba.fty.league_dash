@@ -1,7 +1,9 @@
-test_that("entry UI pings its own origin to keep the Space awake", {
+test_that("entry UI heartbeats itself and the embedded league", {
   head <- as.character(htmltools::renderTags(app_ui(NULL))$head)
 
-  expect_match(head, "www/keepalive.txt", fixed = TRUE)
-  expect_match(head, "cache: 'no-store'", fixed = TRUE)
-  expect_true(file.exists(system.file("app/www/keepalive.txt", package = "entry")))
+  expect_match(head, "window.nbaHeartbeat", fixed = TRUE)
+  expect_match(head, "league_frame", fixed = TRUE)
+  expect_match(head, "mode: 'no-cors'", fixed = TRUE)
+  expect_match(head, "setInterval(nbaHeartbeat, 60000)", fixed = TRUE)
+  expect_false(grepl("keepalive.txt", head, fixed = TRUE))
 })

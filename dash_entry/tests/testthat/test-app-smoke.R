@@ -49,6 +49,7 @@ test_that("entry app boots, logs in and builds a signed iframe", {
         html <- paste(as.character(output$iframe), collapse = "")
         expect_match(html, "hf.space")
         expect_match(html, "sig=")
+        expect_match(html, "window.nbaHeartbeat", fixed = TRUE)
 
         src <- regmatches(html, regexpr("https://[^\"]+", html))
         expect_length(src, 1L)

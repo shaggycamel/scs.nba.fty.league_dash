@@ -141,7 +141,7 @@ app_server <- function(input, output, session) {
       id = "league_frame",
       src = url,
       title = "League dashboard",
-      onload = "if (window.Shiny) Shiny.setInputValue('iframe_loaded', Date.now(), {priority: 'event'});"
+      onload = "if (window.nbaHeartbeat) window.nbaHeartbeat(); if (window.Shiny) Shiny.setInputValue('iframe_loaded', Date.now(), {priority: 'event'});"
     )
   })
 
