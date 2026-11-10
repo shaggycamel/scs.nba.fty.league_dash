@@ -46,7 +46,7 @@ df_nba_schedule <-
   complete(game_date = seq.Date(min(game_date), max(game_date), by = "day")) |>
   select(game_date) |>
   left_join(
-    tbl(db_con, I("nba.schedule_vw")) |>
+    tbl(db_con, I("nba.league_game_schedule_vw")) |> 
       filter(season == cur_season, season_type == "Regular Season") |>
       as_tibble(),
     by = join_by(game_date)
