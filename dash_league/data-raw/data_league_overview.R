@@ -160,7 +160,7 @@ dfs_league_overview <-
 # Only completed matchups count, so an in-progress week is excluded.
 
 dfs_fty_standings <-
-  tbl(db_con, I("fty.matchup_result")) |>
+  tbl(db_con, I("fty.matchup_result_vw")) |>
   filter(season == cur_season) |>
   as_tibble() |>
   filter(league_id %in% target_leagues) |>

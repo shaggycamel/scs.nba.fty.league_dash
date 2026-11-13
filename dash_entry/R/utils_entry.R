@@ -32,7 +32,7 @@ entry_db_connect <- function() {
 #' Verify a customer's credentials against the database
 #'
 #' Looks the customer up by email and checks the password against
-#' `fty.customer.password_hash`. Returns `NA` when the email is unknown or no
+#' `fty.customer_vw.password_hash`. Returns `NA` when the email is unknown or no
 #' password is set, so callers can then try [dev_login()].
 #'
 #' @param con A `DBIConnection`.
@@ -47,14 +47,14 @@ check_credentials <- function(con, email, password) {
   cols <- DBI::dbGetQuery(
     con,
     "select column_name from information_schema.columns
-     where table_schema = 'fty' and table_name = 'customer'"
+     where table_schema = 'fty' and table_name = 'customer_vw'"
   )$column_name
   hash_expr <- if ("password_hash" %in% cols) "password_hash" else "null::text as password_hash"
 
   row <- DBI::dbGetQuery(
     con,
     sprintf(
-      "select customer_id, %s from fty.customer where lower(email) = lower(%s) limit 1",
+      "select customer_id, %s from fty.customer_vw where lower(email) = lower(%s) limit 1",
       hash_expr,
       DBI::dbQuoteString(con, email)
     )
@@ -95,7 +95,7 @@ dev_login <- function(email, password, con) {
   row <- DBI::dbGetQuery(
     con,
     sprintf(
-      "select customer_id from fty.customer where lower(email) = lower(%s) limit 1",
+      "select customer_id from fty.customer_vw where lower(email) = lower(%s) limit 1",
       DBI::dbQuoteString(con, email)
     )
   )
@@ -113,7 +113,7 @@ get_customer_name <- function(con, customer_id) {
   row <- DBI::dbGetQuery(
     con,
     sprintf(
-      "select name, email from fty.customer where customer_id = %s limit 1",
+      "select name, email from fty.customer_vw where customer_id = %s limit 1",
       DBI::dbQuoteString(con, customer_id)
     )
   )
@@ -125,10 +125,10 @@ get_customer_name <- function(con, customer_id) {
 
 #' Leagues a customer belongs to
 #'
-#' Reads `fty.customer_league`, joined to `fty.league` for names. Includes the
-#' customer's `competitor_id` when that column exists on `customer_league`
+#' Reads `fty.customer_league_vw`, joined to `fty.league_vw` for names. Includes
+#' the customer's `competitor_id` when that column exists on `customer_league_vw`
 #' (otherwise `NA`, and the manager must be chosen separately). Also surfaces
-#' `fty.league.slug` / `container_url` / `is_active` when those columns exist,
+#' `fty.league_vw.slug` / `container_url` / `is_active` when those columns exist,
 #' so container URLs can be driven by the registry rather than the naming
 #' convention, and inactive leagues are skipped.
 #'
@@ -142,7 +142,7 @@ get_customer_leagues <- function(con, customer_id, season = entry_season()) {
   cols <- DBI::dbGetQuery(
     con,
     "select column_name from information_schema.columns
-     where table_schema = 'fty' and table_name = 'customer_league'"
+     where table_schema = 'fty' and table_name = 'customer_league_vw'"
   )$column_name
   competitor_col <- if ("competitor_id" %in% cols) {
     "cl.competitor_id::text as competitor_id"
@@ -153,7 +153,7 @@ get_customer_leagues <- function(con, customer_id, season = entry_season()) {
   league_cols <- DBI::dbGetQuery(
     con,
     "select column_name from information_schema.columns
-     where table_schema = 'fty' and table_name = 'league'"
+     where table_schema = 'fty' and table_name = 'league_vw'"
   )$column_name
   slug_expr <- if ("slug" %in% league_cols) "lg.slug::text as slug" else "null::text as slug"
   url_expr <- if ("container_url" %in% league_cols) {
@@ -168,8 +168,8 @@ get_customer_leagues <- function(con, customer_id, season = entry_season()) {
     sprintf(
       "select cl.platform, cl.league_id::text as league_id, lg.league_name,
               %s, %s, %s
-       from fty.customer_league cl
-       left join fty.league lg
+       from fty.customer_league_vw cl
+       left join fty.league_vw lg
          on lg.season = cl.season and lg.platform = cl.platform and lg.league_id = cl.league_id
        where cl.customer_id = %s and cl.season = %s %s
        order by lg.league_name",
@@ -195,7 +195,7 @@ get_league_competitors <- function(con, platform, league_id, season = entry_seas
     con,
     sprintf(
       "select competitor_id::text as competitor_id, competitor_name
-       from fty.league_competitor
+       from fty.league_competitor_vw
        where platform = %s and league_id = %s and season = %s
        order by competitor_name",
       DBI::dbQuoteString(con, platform),

@@ -1,5 +1,5 @@
 all_star_dates <-
-  tbl(db_con, I("nba.key_dates")) |>
+  tbl(db_con, I("nba.key_dates_vw")) |>
   filter(season >= prev_season, season_type == "All Star") |>
   as_tibble() |>
   (\(df) {
@@ -109,7 +109,7 @@ df_nba_roster <- tbl(db_con, I("nba.team_roster_vw")) |>
 
 min_inj_date <- as.Date(cur_date - days(30))
 df_nba_injuries_recent <-
-  tbl(db_con, I("nba.injuries")) |>
+  tbl(db_con, I("nba.injuries_vw")) |>
   filter(game_date >= min_inj_date) |>
   as_tibble()
 

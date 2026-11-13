@@ -1,6 +1,6 @@
 # Package-data consistency: for a points league, each competitor's standings
 # points total is the sum of their weighted category points from the drill-down.
-# Both sides trace back to ESPN's own score (fty.matchup_result), so they must
+# Both sides trace back to ESPN's own score (fty.matchup_result_vw), so they must
 # agree once the season has been built.
 
 test_that("a points league's standings reconcile with its weighted category totals", {

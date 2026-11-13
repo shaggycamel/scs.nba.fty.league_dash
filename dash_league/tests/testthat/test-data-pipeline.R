@@ -90,10 +90,10 @@ test_that("recent injury rows with an nba_id resolve through util.player_id_map_
     con,
     "
     SELECT count(*)::int AS n
-      FROM nba.injuries i
+      FROM nba.injuries_vw i
       LEFT JOIN util.player_id_map_vw nm ON i.nba_id = nm.nba_id
      WHERE i.status = 'Out'
-       AND i.game_date >= (SELECT max(game_date) FROM nba.injuries) - INTERVAL '30 days'
+       AND i.game_date >= (SELECT max(game_date) FROM nba.injuries_vw) - INTERVAL '30 days'
        AND i.nba_id IS NOT NULL
        AND nm.player_key IS NULL"
   )$n
@@ -127,7 +127,7 @@ test_that("a points league's weighted categories reproduce ESPN's official match
     )
     SELECT count(*)::int AS n
       FROM weighted w
-      JOIN fty.matchup_result mr
+      JOIN fty.matchup_result_vw mr
         ON mr.season = w.season
        AND mr.platform = w.platform
        AND mr.league_id = w.league_id
@@ -198,7 +198,7 @@ test_that("a points league's h2h past totals reconcile with the official matchup
     sprintf(
       "SELECT league_id::int AS league_id, matchup::int AS matchup,
             competitor_id::int AS competitor_id, score
-       FROM fty.matchup_result
+       FROM fty.matchup_result_vw
       WHERE season = '%s'",
       season
     )

@@ -22,10 +22,10 @@ emails <- DBI::dbGetQuery(
   con,
   sprintf(
     "select distinct c.email
-       from fty.customer c
-       join fty.customer_league cl
+       from fty.customer_vw c
+       join fty.customer_league_vw cl
          on cl.customer_id = c.customer_id
-       join fty.league lg
+       join fty.league_vw lg
          on lg.season = cl.season
         and lg.platform = cl.platform
         and lg.league_id = cl.league_id

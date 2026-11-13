@@ -1,7 +1,7 @@
 # List leagues to build ------------------------------------------------
 # Emits "platform,league_id,slug" (one per line) for the current season, so the
 # deploy scripts do not need psql or a DATABASE_URL — R + the credentials INI
-# are enough. Uses fty.league.slug / is_active when those columns exist.
+# are enough. Uses fty.league_vw.slug / is_active when those columns exist.
 
 source(here::here("data-raw", "_setup.R"))
 source(here::here("R", "utils_database.R"))
@@ -13,7 +13,7 @@ on.exit(DBI::dbDisconnect(con), add = TRUE)
 cols <- DBI::dbGetQuery(
   con,
   "select column_name from information_schema.columns
-   where table_schema = 'fty' and table_name = 'league'"
+   where table_schema = 'fty' and table_name = 'league_vw'"
 )$column_name
 
 slug_expr <- if ("slug" %in% cols) "slug::text" else "null::text"
@@ -23,7 +23,7 @@ df <- DBI::dbGetQuery(
   con,
   sprintf(
     "select platform, league_id, %s as slug
-     from fty.league where season = %s %s order by league_id",
+     from fty.league_vw where season = %s %s order by league_id",
     slug_expr,
     DBI::dbQuoteString(con, season),
     active_clause

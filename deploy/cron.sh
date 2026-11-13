@@ -21,6 +21,9 @@
 # start, shared by all rows of the run). Logging is best-effort and needs a
 # write-capable section (NBA_UPDATE_LOG_SECTION, default cockroach-write); it
 # never fails the deploy.
+#
+# The data build reads the public view layer through kobe_public; the raw tables
+# it used to read are private. Logging still uses NBA_UPDATE_LOG_SECTION.
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
