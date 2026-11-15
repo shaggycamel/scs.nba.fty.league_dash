@@ -23,6 +23,22 @@ team_injury_data <- function(window, team) {
 }
 
 
+# reactable converts detail tags to React without running htmltools render
+# hooks, so bslib's Bootstrap 5 nav classes never reach the DOM.
+apply_render_hooks <- function(x) {
+  if (!inherits(x, "shiny.tag")) {
+    return(x)
+  }
+
+  for (hook in x$.renderHooks) {
+    x <- hook(x)
+  }
+  x$.renderHooks <- NULL
+  x$children <- lapply(x$children, apply_render_hooks)
+  x
+}
+
+
 details_table <- function(df, empty_text) {
   if (nrow(df) == 0) {
     return(tags$p(empty_text))
@@ -71,9 +87,11 @@ comparison_details_tabs <- function(player_name, team, player_id, window, cats, 
 
   tags$div(
     style = "margin-left: 45px; margin-top: 10px; margin-bottom: 30px;",
-    bslib::navset_tab(
-      nav_panel("Game Log", game_log),
-      nav_panel("Injuries", injuries)
+    apply_render_hooks(
+      bslib::navset_tab(
+        nav_panel("Game Log", game_log),
+        nav_panel("Injuries", injuries)
+      )
     )
   )
 }

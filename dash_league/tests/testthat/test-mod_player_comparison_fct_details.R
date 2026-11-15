@@ -83,3 +83,20 @@ test_that("an expanded row falls back to text when a player or injury list is mi
   expect_match(html, "Player not found...", fixed = TRUE)
   expect_match(html, "No Injuries", fixed = TRUE)
 })
+
+test_that("expanded row tabs carry the Bootstrap 5 nav classes", {
+  local_pkg_data(
+    ls_player_game_log = list("1" = details_game_log()),
+    ls_injuries = details_injuries()
+  )
+
+  old_theme <- shiny::shinyOptions()[["bootstrapTheme"]]
+  shiny::shinyOptions(bootstrapTheme = bslib::bs_theme(version = 5))
+  on.exit(shiny::shinyOptions(bootstrapTheme = old_theme), add = TRUE)
+
+  tabs <- comparison_details_tabs("Ann", "LAL", 1L, "7", c("pts", "ast"), details_weights(), TRUE)
+  links <- tabs$children[[1]]$children[[1]]$children
+
+  expect_match(links[[1]]$children[[1]]$attribs$class, "nav-link active", fixed = TRUE)
+  expect_match(links[[2]]$children[[1]]$attribs$class, "nav-link", fixed = TRUE)
+})
