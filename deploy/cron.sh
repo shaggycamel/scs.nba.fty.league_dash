@@ -10,6 +10,8 @@
 # Run this directly (cronjobs run `deploy/cron.sh`). The entry-point container is
 # deployed only when BUILD_ENTRY=1, since rebuilding it restarts the entry Space.
 # SKIP_BASE=1 reuses the cached shared NBA base for fantasy-only refresh runs.
+# BUILD_ONLY=1 builds each league image locally and stops before Docker Hub push
+# and the HF deploy, so no Space is touched (no Docker Hub/HF tokens needed).
 #
 # Usage: deploy/cron.sh [daily|intraday|...]   (default: all)
 # The cadence argument selects nothing here (every run deploys every active
@@ -90,6 +92,7 @@ EXCLUDE_LEAGUES="${EXCLUDE_LEAGUES:-}"
 DRY_RUN="${DRY_RUN:-0}"
 REBUILD_BASE="${REBUILD_BASE:-0}"
 BUILD_ENTRY="${BUILD_ENTRY:-0}"
+BUILD_ONLY="${BUILD_ONLY:-0}"
 PROVISION="${PROVISION:-0}"
 # SKIP_BASE=1 reuses the cached NBA base (data-raw/cache/base.rda) instead of
 # regenerating it, for fantasy-only refresh runs between the daily base build.
@@ -101,6 +104,11 @@ HUGGINGFACE_TOKEN="${HUGGINGFACE_TOKEN:-}"
 
 # shellcheck source=/dev/null
 source "${REPO_DIR}/deploy/adapter.sh"
+
+if [ "$BUILD_ONLY" = "1" ] && [ "$BUILD_ENTRY" = "1" ]; then
+  printf 'BUILD_ONLY=1 cannot be combined with BUILD_ENTRY=1\n' >&2
+  exit 1
+fi
 
 STAGE=""
 LAST_ERROR=""
@@ -218,6 +226,11 @@ process_league() {
     step "[dry-run] generate + build image ${image}"
   fi
 
+  if [ "$BUILD_ONLY" = "1" ]; then
+    printf "  · [build-only] built %s, not pushing or deploying\n" "$image"
+    return 0
+  fi
+
   step "Pushing ${image}"
   if [ "$DRY_RUN" != "1" ]; then
     docker push "$image" || { fail "docker push"; return 1; }
@@ -256,7 +269,7 @@ if ! build_base; then
 fi
 
 if [ "$DRY_RUN" != "1" ]; then
-  if [ -z "$DOCKERHUB_TOKEN" ]; then
+  if [ "$BUILD_ONLY" != "1" ] && [ -z "$DOCKERHUB_TOKEN" ]; then
     mark_failed "dockerhub token"
     printf '✘ DOCKERHUB_TOKEN not set\n' >&2
     exit 1
@@ -278,8 +291,10 @@ if [ "$DRY_RUN" != "1" ]; then
     fi
   fi
 
-  step "Logging in to Docker Hub"
-  echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin || { mark_failed "docker login"; exit 1; }
+  if [ "$BUILD_ONLY" != "1" ]; then
+    step "Logging in to Docker Hub"
+    echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin || { mark_failed "docker login"; exit 1; }
+  fi
 fi
 
 step "Fetching active leagues for season ${SEASON:-default}"
@@ -338,7 +353,7 @@ fi
 # not. A SLEEPING entry is left asleep (wake=0); it rebuilds HEAD when next woken.
 # League Spaces are verified inside adapter_deploy. No-op for non-HF providers
 # (the health helpers only exist for HF).
-if [ "$DRY_RUN" != "1" ] && command -v hf_wait_healthy >/dev/null 2>&1; then
+if [ "$DRY_RUN" != "1" ] && [ "$BUILD_ONLY" != "1" ] && command -v hf_wait_healthy >/dev/null 2>&1; then
   step "Verifying the entry Space is on its current build"
   ENTRY_REPO="$(hf_space_id "${ENTRY_SLUG:-entry}")"
   if hf_wait_healthy "$ENTRY_REPO" "$(hf_space_head "$ENTRY_REPO")" "${HF_HEALTH_TIMEOUT:-900}" 0; then

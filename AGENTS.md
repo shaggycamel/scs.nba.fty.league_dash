@@ -54,7 +54,10 @@ npm test
 ## Deploy
 
 `deploy/cron.sh` is the single deploy entry point (base image + one image per
-league; `BUILD_ENTRY=1` also rebuilds the entry Space). `deploy/build_entry.sh`
+league; `BUILD_ENTRY=1` also rebuilds the entry Space). `BUILD_ONLY=1` builds
+each league image locally and stops before Docker Hub push and the HF deploy, so
+no Space is touched (no deploy tokens needed); use it to verify a build without
+touching production. `deploy/build_entry.sh`
 does entry only. It takes an optional cadence arg (`daily`/`intraday`, default
 `all`) and appends best-effort `dashboard:*` rows to `util.update_log` via
 `core::log_update()` (`cockroach-write`), each stamped with `source` (this repo's

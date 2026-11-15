@@ -130,17 +130,25 @@ set -a; source ~/.config/scs_deploy.env; set +a
 # 5.0 Dry run (no docker, no push, no deploy)
 DRY_RUN=1 PROVISION=1 bash deploy/cron.sh
 
-# 5.1 Real run. PROVISION=1 creates any missing HF Spaces.
+# 5.1 Build only: build each league image locally; no Docker Hub push and no
+# HF deploy, so no Spaces are touched and no deploy tokens are needed. The
+# Spaces keep running their previous build until a normal run below.
+BUILD_ONLY=1 bash deploy/cron.sh
+
+# 5.2 Real run. PROVISION=1 creates any missing HF Spaces.
 PROVISION=1 bash deploy/cron.sh
 
-# 5.2 Full run including the entry point (this restarts the entry Space).
+# 5.3 Full run including the entry point (this restarts the entry Space).
 PROVISION=1 BUILD_ENTRY=1 bash deploy/cron.sh
 
-# 5.3 Cadence runs (as cron): a bare run is 'all'; the arg only labels the
+# 5.4 Cadence runs (as cron): a bare run is 'all'; the arg only labels the
 # util.update_log rows. daily builds the base, intraday reuses the cached base.
 PROVISION=1 bash deploy/cron.sh daily
 SKIP_BASE=1 PROVISION=1 bash deploy/cron.sh intraday
 ```
+
+`BUILD_ONLY=1` is incompatible with `BUILD_ENTRY=1`. Like any run, it
+regenerates the shared NBA base unless `SKIP_BASE=1` is also set.
 
 `deploy/cron.sh` does, in order:
 1. Base image `scs.nba.fty.league_dash_base:latest` (slow; skipped if it exists unless `REBUILD_BASE=1`)
