@@ -56,6 +56,9 @@ app_ui <- function(request) {
          });
          document.addEventListener('keydown', function (e) {
            if (e.key === 'Enter' && e.target && e.target.id === 'password') {
+             e.preventDefault();
+             // Shiny debounces password input; blur flushes it before login.
+             e.target.blur();
              var b = document.getElementById('login');
              if (b && !b.disabled) b.click();
            }
