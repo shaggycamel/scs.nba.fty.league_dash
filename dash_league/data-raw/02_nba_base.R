@@ -114,6 +114,20 @@ df_nba_injuries_recent <-
   as_tibble()
 
 
+# Predicted injury returns -----------------------------------------------
+
+df_player_return <-
+  tbl(db_con, I("mod.injury_daily_forecast_vw")) |>
+  filter(season == cur_season) |>
+  select(player_id, spell_id, injury_start_date, prediction_date, pred_return_date, censored) |>
+  as_tibble() |>
+  mutate(
+    player_id = as.integer(player_id),
+    across(c(injury_start_date, prediction_date, pred_return_date), as.Date)
+  ) |>
+  latest_predicted_return()
+
+
 # Player rolling stats ---------------------------------------------------
 
 dfs_rolling_stats <- df_nba_player_box_score |>
@@ -179,6 +193,7 @@ dfs_rolling_stats <- df_nba_player_box_score |>
           )
       ) |>
       mutate(inj_status = coalesce(inj_status, "Available")) |>
+      attach_predicted_injury_status(df_player_return, cur_date) |>
       arrange(game_date)
   }) |>
   map(\(df_t) {

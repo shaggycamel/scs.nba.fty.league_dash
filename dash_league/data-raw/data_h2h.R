@@ -39,6 +39,15 @@ dfs_h2h_past <- dfs_fty_roster |>
 
 # H2H Today and Future ---------------------------------------------------
 
+df_stat_forecast <-
+  tbl(db_con, I("mod.player_stat_forecast_vw")) |>
+  filter(season == cur_season, game_date >= cur_date) |>
+  select(player_id, game_id, minutes_if_plays, starts_with("pred_")) |>
+  as_tibble() |>
+  mutate(player_id = as.integer(player_id), game_id = as.integer(game_id)) |>
+  forecast_box_score_stats()
+
+
 dfs_h2h_future_generation <- function() {
   #
   # fty roster & free agents
@@ -109,6 +118,7 @@ dfs_h2h_future_generation <- function() {
           window,
           player_id,
           inj_status,
+          inj_status_pred,
           inj_reason,
           game_date,
           dow,
@@ -127,6 +137,24 @@ dfs_h2h_future_generation <- function() {
       matchup_period != "99" | game_date == min(game_date),
       .by = c(league_id, competitor_id, player_id, matchup_period)
     )
+
+  # Prediction mode: the same 7-day rows with model stats and predicted availability.
+  predicted_rows <- df |>
+    filter(window == "7") |>
+    left_join(df_stat_forecast, by = join_by(player_id, game_id), suffix = c("", "_fc"))
+
+  for (col in c("min", names(forecast_stat_map))) {
+    pred_col <- str_c(col, "_fc")
+    if (pred_col %in% names(predicted_rows)) {
+      predicted_rows[[col]] <- coalesce(predicted_rows[[pred_col]], predicted_rows[[col]])
+    }
+  }
+
+  predicted_rows <- predicted_rows |>
+    select(-ends_with("_fc")) |>
+    mutate(window = "predicted", inj_status = inj_status_pred)
+
+  df <- bind_rows(df, predicted_rows)
 
   # Add matchup lookahead
   # Not sure how this will look when cur_date == matchup_end

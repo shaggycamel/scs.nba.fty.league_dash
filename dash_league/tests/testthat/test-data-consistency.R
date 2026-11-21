@@ -136,7 +136,7 @@ test_that("every built league has free-agent future games", {
   future <- pkg[["dfs_h2h_future"]]
   for (lg in names(future)) {
     windows <- purrr::pluck(future, lg, "free_agent", "free_agent")
-    expected <- c("7", "15", "30")
+    expected <- c("7", "15", "30", "predicted")
     expect_type(windows, "list")
     expect_true(all(expected %in% names(windows)))
     for (window in expected) {

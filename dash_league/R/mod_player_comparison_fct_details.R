@@ -164,12 +164,14 @@ comparison_details_tabs <- function(
     )
   }
 
+  injury_window <- if (identical(as.character(window), "predicted")) "7" else as.character(window)
+
   injuries <- if (is.na(team)) {
     tags$p("Team not found...")
   } else {
     tagList(
-      tags$h2(class = "title", str_c(team, " Last ", window, " Day Injury History")),
-      details_table(team_injury_data(window, team), "No Injuries")
+      tags$h2(class = "title", str_c(team, " Last ", injury_window, " Day Injury History")),
+      details_table(team_injury_data(injury_window, team), "No Injuries")
     )
   }
 

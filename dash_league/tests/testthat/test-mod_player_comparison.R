@@ -36,3 +36,10 @@ test_that("module ui works", {
     expect_true(i %in% names(fmls))
   }
 })
+
+test_that("the window selector offers a predicted mode", {
+  html <- htmltools::renderTags(mod_player_comparison_ui("test"))$html
+
+  expect_match(html, ">P<", fixed = TRUE)
+  expect_match(html, 'value="predicted"', fixed = TRUE)
+})

@@ -12,7 +12,12 @@ mod_h2h_ui <- function(id) {
     layout_sidebar(
       sidebar = sidebar(
         selectizeInput(ns("matchup"), NULL, choices = 0),
-        radioButtons(ns("window"), NULL, c(7, 15, 30), inline = TRUE),
+        radioButtons(
+          ns("window"),
+          NULL,
+          choices = c("7" = "7", "15" = "15", "30" = "30", "P" = "predicted"),
+          inline = TRUE
+        ),
         selectInput(ns("hl_player"), NULL, choices = character(0), multiple = TRUE),
         layout_columns(
           dateInput(ns("pin_date"), NULL, weekstart = 1),
@@ -403,7 +408,7 @@ mod_h2h_server <- function(
         selected = vals$hl_player
       )
       updateDateInput(session, "pin_date", value = vals$pin_date)
-      updateSliderInput(session, "window", value = vals$window)
+      updateRadioButtons(session, "window", selected = as.character(vals$window))
       updateCheckboxInput(session, "future_only", value = vals$future_only)
       rv_alter_team(vals$alter_team)
     }) |>

@@ -1,89 +1,127 @@
 # Player Comparison ------------------------------------------------------
 
+df_stat_forecast <-
+  tbl(db_con, I("mod.player_stat_forecast_vw")) |>
+  filter(season == cur_season, game_date >= cur_date) |>
+  select(player_id, minutes_if_plays, starts_with("pred_")) |>
+  as_tibble() |>
+  mutate(player_id = as.integer(player_id)) |>
+  forecast_box_score_stats() |>
+  summarise(
+    across(c(min, all_of(names(forecast_stat_map))), \(x) mean(x, na.rm = TRUE)),
+    .by = player_id
+  )
+
+
+comparison_input <- function(stats, cur_season, cur_date) {
+  df_inr <- stats |>
+    filter(season == cur_season) |>
+    select(-any_of("inj_status_pred")) |>
+    slice_max(game_date, by = player_id, with_ties = FALSE)
+
+  next_status <- stats |>
+    filter(season == cur_season) |>
+    next_game_injury_status(cur_date)
+
+  df_inr |>
+    left_join(next_status, by = join_by(player_id)) |>
+    mutate(inj_status_pred = coalesce(inj_status_pred, inj_status))
+}
+
+
+build_comparison <- function(df_inr, stat_weights, free_agents, lg) {
+  # Shooting z-scores come from the raw counts: rescaling fgm/fga/ftm/fta first
+  # would change the percentages and attempt weights they are built from.
+  df_compare <- df_inr |> calc_z_pcts()
+
+  comparison_meta <- df_fty_cats |>
+    filter(
+      league_id == lg,
+      (category_role == "scored" & !is_ratio) |
+        (category_role == "derived" & str_like(nba_category, "%_z")),
+      nba_category %in% colnames(df_compare)
+    ) |>
+    distinct(nba_category, higher_is_better)
+
+  higher_cols <- comparison_meta |>
+    filter(higher_is_better) |>
+    pull(nba_category)
+
+  lower_cols <- comparison_meta |>
+    filter(!higher_is_better) |>
+    pull(nba_category)
+
+  df_compare |>
+    mutate(
+      across(all_of(higher_cols), \(x) round(scales::rescale(x), 2)),
+      # Invert the categories where a low value is the good outcome (eg turnovers)
+      across(all_of(lower_cols), \(x) round(scales::rescale(-x), 2))
+    ) |>
+    pivot_longer(
+      cols = all_of(comparison_meta$nba_category),
+      names_to = "stat"
+    ) |>
+    (\(x) {
+      bind_rows(
+        # Moved Excels at to happen reactively in mod file
+        slice_min(x, value, n = 3, by = c(player_id, player_name)) |>
+          mutate(performance = "Weak At")
+      )
+    })() |>
+    mutate(stat_value = paste0(stat, " (", round(value, 2), ")")) |>
+    summarise(
+      stat_value = paste(stat_value, collapse = "\n"),
+      .by = c(player_id, player_name, team, inj_status, inj_status_pred, performance)
+    ) |>
+    pivot_wider(names_from = performance, values_from = stat_value) |>
+    left_join(
+      df_inr |>
+        select(player_id, min, any_of(unique(df_fty_cats$nba_category))),
+      by = join_by(player_id)
+    ) |>
+    (\(df) {
+      if (any(!is.na(stat_weights$points))) {
+        df |>
+          mutate(
+            fty_pts = calc_fty_points(pick(any_of(stat_weights$nba_category)), stat_weights)
+          )
+      } else {
+        df
+      }
+    })() |>
+    calc_z_pcts() |>
+    left_join(free_agents, by = join_by(player_id)) |>
+    left_join(
+      tibble(team = names(ls_nba_teams), team_id = ls_nba_teams),
+      by = join_by(team)
+    ) |>
+    relocate(team_id, .before = team) |>
+    arrange(desc(min)) |>
+    # to lighten the size of final object
+    select(-any_of("pf"), -ends_with("_pct"))
+}
+
+
 dfs_player_comparison <- map(set_names(as.character(unique(df_fty_base$league_id))), \(lg) {
   stat_weights <- df_fty_cat_weights |>
     filter(league_id == as.integer(lg))
 
-  map(set_names(names(dfs_rolling_stats)), \(rl) {
-    df_inr <- dfs_rolling_stats[[rl]] |>
-      filter(season == cur_season) |>
-      slice_max(game_date, by = player_id, with_ties = FALSE)
+  free_agents <- pluck(dfs_fty_free_agents, as.character(lg), .default = tibble(player_id = integer())) |>
+    select(player_id) |>
+    distinct() |>
+    mutate(free_agent = TRUE)
 
-    free_agents <- pluck(dfs_fty_free_agents, as.character(lg), .default = tibble(player_id = integer())) |>
-      select(player_id) |>
-      distinct() |>
-      mutate(free_agent = TRUE)
-
-    # Shooting z-scores come from the raw counts: rescaling fgm/fga/ftm/fta first
-    # would change the percentages and attempt weights they are built from.
-    df_compare <- df_inr |> calc_z_pcts()
-
-    comparison_meta <- df_fty_cats |>
-      filter(
-        league_id == lg,
-        (category_role == "scored" & !is_ratio) |
-          (category_role == "derived" & str_like(nba_category, "%_z")),
-        nba_category %in% colnames(df_compare)
-      ) |>
-      distinct(nba_category, higher_is_better)
-
-    higher_cols <- comparison_meta |>
-      filter(higher_is_better) |>
-      pull(nba_category)
-
-    lower_cols <- comparison_meta |>
-      filter(!higher_is_better) |>
-      pull(nba_category)
-
-    df_compare |>
-      mutate(
-        across(all_of(higher_cols), \(x) round(scales::rescale(x), 2)),
-        # Invert the categories where a low value is the good outcome (eg turnovers)
-        across(all_of(lower_cols), \(x) round(scales::rescale(-x), 2))
-      ) |>
-      pivot_longer(
-        cols = all_of(comparison_meta$nba_category),
-        names_to = "stat"
-      ) |>
-      (\(x) {
-        bind_rows(
-          # Moved Excels at to happen reactively in mod file
-          slice_min(x, value, n = 3, by = c(player_id, player_name)) |>
-            mutate(performance = "Weak At")
-        )
-      })() |>
-      mutate(stat_value = paste0(stat, " (", round(value, 2), ")")) |>
-      summarise(
-        stat_value = paste(stat_value, collapse = "\n"),
-        .by = c(player_id, player_name, team, inj_status, performance)
-      ) |>
-      pivot_wider(names_from = performance, values_from = stat_value) |>
-      left_join(
-        df_inr |>
-          select(player_id, min, any_of(unique(df_fty_cats$nba_category))),
-        by = join_by(player_id)
-      ) |>
-      (\(df) {
-        if (any(!is.na(stat_weights$points))) {
-          df |>
-            mutate(
-              fty_pts = calc_fty_points(pick(any_of(stat_weights$nba_category)), stat_weights)
-            )
-        } else {
-          df
-        }
-      })() |>
-      calc_z_pcts() |>
-      left_join(free_agents, by = join_by(player_id)) |>
-      left_join(
-        tibble(team = names(ls_nba_teams), team_id = ls_nba_teams),
-        by = join_by(team)
-      ) |>
-      relocate(team_id, .before = team) |>
-      arrange(desc(min)) |>
-      # to lighten the size of final object
-      select(-any_of("pf"), -ends_with("_pct"))
+  windows <- map(set_names(names(dfs_rolling_stats)), \(rl) {
+    comparison_input(dfs_rolling_stats[[rl]], cur_season, cur_date) |>
+      build_comparison(stat_weights, free_agents, lg)
   })
+
+  predicted <- comparison_input(dfs_rolling_stats[["7"]], cur_season, cur_date) |>
+    rows_update(df_stat_forecast, by = "player_id") |>
+    mutate(inj_status = inj_status_pred) |>
+    build_comparison(stat_weights, free_agents, lg)
+
+  c(windows, list(predicted = predicted))
 })
 
 
