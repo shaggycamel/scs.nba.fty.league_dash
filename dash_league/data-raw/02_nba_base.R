@@ -46,7 +46,7 @@ df_nba_schedule <-
   complete(game_date = seq.Date(min(game_date), max(game_date), by = "day")) |>
   select(game_date) |>
   left_join(
-    tbl(db_con, I("nba.league_game_schedule_vw")) |> 
+    tbl(db_con, I("nba.league_game_schedule_vw")) |>
       filter(season == cur_season, season_type == "Regular Season") |>
       as_tibble(),
     by = join_by(game_date)
@@ -226,6 +226,65 @@ ls_injuries <-
   })
 
 
+# Team depth chart (shared) -----------------------------------------------
+
+df_last_start <-
+  tbl(db_con, I("nba.player_box_score_vw")) |>
+  filter(season == cur_season, start_position %in% c("G", "F", "C")) |>
+  select(player_id, game_date, start_position) |>
+  as_tibble() |>
+  mutate(player_id = as.integer(player_id)) |>
+  slice_max(game_date, by = player_id, with_ties = FALSE) |>
+  select(player_id, start_position)
+
+df_roster_position <-
+  tbl(db_con, I("nba.team_roster_vw")) |>
+  filter(season == cur_season, entry_date <= cur_date, is.na(exit_date) | exit_date >= cur_date) |>
+  select(player_id, entry_date, listed_position = position) |>
+  as_tibble() |>
+  mutate(player_id = as.integer(player_id)) |>
+  slice_max(entry_date, by = player_id, with_ties = FALSE) |>
+  select(player_id, listed_position)
+
+df_team_depth <-
+  tbl(db_con, I("mod.team_hierarchy_vw")) |>
+  filter(season == cur_season) |>
+  as_tibble() |>
+  mutate(
+    across(ends_with("_id"), \(x) as.integer(x)),
+    game_date = as.Date(game_date)
+  ) |>
+  left_join(df_last_start, by = "player_id") |>
+  left_join(df_roster_position, by = "player_id") |>
+  mutate(
+    position_group = case_when(
+      !is.na(start_position) ~ start_position,
+      str_starts(listed_position, "G") ~ "G",
+      str_starts(listed_position, "F") ~ "F",
+      str_starts(listed_position, "C") ~ "C",
+      position %in% c("PG", "SG") ~ "G",
+      position %in% c("SF", "PF") ~ "F",
+      TRUE ~ "C"
+    )
+  )
+
+ls_team_depth <-
+  team_depth_snapshot(df_team_depth, cur_date) |>
+  select(
+    team_abbreviation,
+    game_date,
+    opponent,
+    home,
+    position_group,
+    player_id,
+    player_name,
+    expected_minutes
+  ) |>
+  arrange(team_abbreviation, position_group, desc(expected_minutes), player_name) |>
+  nest_by(team_abbreviation) |>
+  deframe()
+
+
 # Player game log (shared) -----------------------------------------------
 
 ls_player_game_log <-
@@ -254,6 +313,7 @@ save(
   dfs_rolling_stats,
   ls_nba_teams,
   ls_injuries,
+  ls_team_depth,
   ls_player_game_log,
   file = file.path(cache_dir, "base.rda"),
   compress = "xz"

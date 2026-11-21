@@ -20,8 +20,18 @@ if (!exists("dfs_rolling_stats", inherits = FALSE)) {
   load(base_cache)
 }
 
+if (!exists("ls_team_depth", inherits = FALSE)) {
+  stop("Base cache is stale; run _generate_base.R (or REBUILD_BASE=1) first")
+}
+
 # Shared runtime objects ship with every league container's app data.
-usethis::use_data(ls_nba_teams, ls_injuries, ls_player_game_log, overwrite = TRUE)
+usethis::use_data(
+  ls_nba_teams,
+  ls_injuries,
+  ls_team_depth,
+  ls_player_game_log,
+  overwrite = TRUE
+)
 
 source(here::here("data-raw", "03_fty_base.R"))
 source(here::here("data-raw", "data_h2h.R"))

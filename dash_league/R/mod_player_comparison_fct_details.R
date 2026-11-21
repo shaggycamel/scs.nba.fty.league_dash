@@ -63,7 +63,95 @@ details_table <- function(df, empty_text) {
 }
 
 
-comparison_details_tabs <- function(player_name, team, player_id, window, cats, cat_weights, is_points_league) {
+team_depth_chart <- function(player_id, team, depth = ls_team_depth) {
+  df <- pluck(depth, as.character(team), .default = tibble())
+
+  if (nrow(df) == 0) {
+    return(empty_state("No depth chart available for this team."))
+  }
+
+  positions <- intersect(c("G", "F", "C"), unique(df$position_group))
+
+  if (length(positions) == 0) {
+    return(empty_state("No depth chart available for this team."))
+  }
+
+  columns <- map(positions, \(pos) {
+    players <- df |>
+      filter(position_group == pos) |>
+      arrange(desc(expected_minutes), player_name)
+
+    rows <- map(seq_len(nrow(players)), \(i) {
+      selected <- !is.na(player_id) &&
+        !is.na(players$player_id[[i]]) &&
+        players$player_id[[i]] == player_id
+      minutes <- players$expected_minutes[[i]]
+      minutes <- if (is.na(minutes)) "-" else formatC(minutes, format = "f", digits = 1)
+
+      tags$div(
+        style = str_c(
+          "padding: 3px 6px; border: 1px solid #e6e6e6; border-radius: 4px; margin-bottom: 2px;",
+          if (selected) " background-color: #f1e78e; font-weight: 700;" else ""
+        ),
+        tags$div(
+          style = "white-space: nowrap; overflow: hidden; text-overflow: ellipsis;",
+          players$player_name[[i]]
+        ),
+        tags$div(style = "font-size: 80%; color: #555;", str_c(minutes, " min"))
+      )
+    })
+
+    tags$div(
+      style = "border: 1px solid #e6e6e6; padding: 4px;",
+      tags$div(
+        style = str_c(
+          "padding: 2px 0; margin-bottom: 4px; border-radius: 4px;",
+          " background-color: #cce5ff; font-weight: 700; text-align: center;"
+        ),
+        pos
+      ),
+      rows
+    )
+  })
+
+  opponent <- df$opponent[[1]]
+  venue <- if (isFALSE(df$home[[1]])) "@ " else "vs "
+  opponent_label <- if (is.na(opponent)) {
+    NULL
+  } else {
+    tags$span(
+      style = "font-size: 70%; font-weight: 400; color: #555;",
+      str_c(" - ", venue, opponent)
+    )
+  }
+
+  tagList(
+    tags$h2(class = "title", str_c(team, " Depth Chart"), opponent_label),
+    tags$div(
+      style = "border: 1px solid #e6e6e6; padding: 8px; max-width: 900px;",
+      tags$div(
+        style = str_c(
+          "display: grid; grid-template-columns: repeat(",
+          length(positions),
+          ", minmax(0, 1fr)); gap: 12px;"
+        ),
+        columns
+      )
+    )
+  )
+}
+
+
+comparison_details_tabs <- function(
+  player_name,
+  team,
+  player_id,
+  window,
+  cats,
+  cat_weights,
+  is_points_league,
+  depth = ls_team_depth
+) {
   game_log <- if (is.na(player_name)) {
     tags$p("Player not found...")
   } else {
@@ -85,12 +173,19 @@ comparison_details_tabs <- function(player_name, team, player_id, window, cats, 
     )
   }
 
+  depth_chart <- if (is.na(team)) {
+    tags$p("Team not found...")
+  } else {
+    team_depth_chart(player_id, team, depth)
+  }
+
   tags$div(
     style = "margin-left: 45px; margin-top: 10px; margin-bottom: 30px;",
     apply_render_hooks(
       bslib::navset_tab(
         nav_panel("Game Log", game_log),
-        nav_panel("Injuries", injuries)
+        nav_panel("Injuries", injuries),
+        nav_panel("Depth Chart", depth_chart)
       )
     )
   )

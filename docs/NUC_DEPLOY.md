@@ -26,11 +26,12 @@ Read this whole file before running anything. Prefer `DRY_RUN=1` first.
 - **No host R/renv is needed.** All R steps (data generation, `R CMD build`, league
   listing) run inside the `scs.nba.fty.league_dash_base:latest` image, which carries the restored
   library. (The host must have Docker; R is used via `docker run`.)
-- Credentials INI exists: `~/.config/scs_hub_credentials.ini` with a
-  `cockroach-read` section (and `postgres` for local). Generation defaults to
-  `NBA_DB_SECTION=cockroach-read`. (No `psql` needed — leagues are listed via R in
-  the base image.) The dashboard update log also needs a `cockroach-write`
-  section, unless `NBA_UPDATE_LOG_SECTION` points elsewhere.
+- Credentials INI exists: `~/.config/scs_hub_credentials.ini` with a `jetson-read`
+  section for generation and `jetson-write` for the update log (plus `postgres`
+  for local). The NUC cron exports `NBA_DB_SECTION=jetson-read` and
+  `NBA_UPDATE_LOG_SECTION=jetson-write`; without them the R fallbacks
+  `cockroach-read`/`-write` point at Cockroach, which does not hold the `mod.*`
+  layer. (No `psql` needed — leagues are listed via R in the base image.)
 - A `~/.config/scs_deploy.env` on the nuc exports the tokens (mode `600`; the
   scripts source it automatically when run non-interactively; for a manual run,
   source it first):
