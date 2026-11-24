@@ -515,14 +515,16 @@ mod_h2h_server <- function(
 
     output$stat_plot <- renderD3({
       req(df_plt())
+      plt <- df_plt()
 
       r2d3(
-        data = df_plt(),
+        data = plt,
         script = app_sys("d3/h2h_stat_plot/h2h_stat_plot.js"),
         options = list(
           expanded = plot_expanded(),
           toggle_input = ns("h2h_plot_expanded"),
-          league_id = as.character(rv_carry_thru$league_id)
+          league_id = as.character(rv_carry_thru$league_id),
+          projected_badges = projected_badge_values(plt, is_points_league())
         )
       )
     })

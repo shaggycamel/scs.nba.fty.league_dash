@@ -143,6 +143,57 @@ plot_data_prep <- function(df_base, rv_carry_thru) {
 }
 
 
+# Values for the badge beside each competitor name: category wins in category
+# leagues, the overall projected FTY points total in points leagues.
+projected_badge_values <- function(df_plt, points_league) {
+  df <- df_plt |>
+    mutate(competitor = as.character(competitor), name = as.character(name))
+
+  if (points_league) {
+    if (!"is_overall" %in% names(df)) {
+      return(NULL)
+    }
+
+    overall <- df |>
+      filter(coalesce(is_overall, FALSE)) |>
+      summarise(points = round(sum(value, na.rm = TRUE)), .by = competitor)
+
+    if (nrow(overall) == 0) {
+      return(NULL)
+    }
+
+    return(as.list(set_names(as.integer(overall$points), overall$competitor)))
+  }
+
+  competitors <- unique(df$competitor)
+  if (length(competitors) != 2 || !"is_negative" %in% names(df)) {
+    return(NULL)
+  }
+
+  compared <- df |>
+    filter(!is.na(value)) |>
+    select(competitor, name, value, is_negative) |>
+    pivot_wider(
+      id_cols = c(name, is_negative),
+      names_from = competitor,
+      values_from = value
+    ) |>
+    filter(!is.na(.data[[competitors[[1]]]]), !is.na(.data[[competitors[[2]]]])) |>
+    mutate(
+      sign = if_else(coalesce(is_negative, FALSE), -1, 1),
+      first_leads = .data[[competitors[[1]]]] * sign > .data[[competitors[[2]]]] * sign,
+      second_leads = .data[[competitors[[2]]]] * sign > .data[[competitors[[1]]]] * sign
+    )
+
+  wins <- tibble(
+    competitor = competitors,
+    wins = c(sum(compared$first_leads), sum(compared$second_leads))
+  )
+
+  as.list(set_names(as.integer(wins$wins), wins$competitor))
+}
+
+
 # Season totals for the postseason plot. The past data carries a two-day
 # lookahead per matchup, so cut at each matchup's own end to avoid double counting.
 postseason_base_data_prep <- function(df_h2h_past, selected_competitor_id, competitor_name) {

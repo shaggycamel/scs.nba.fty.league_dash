@@ -247,6 +247,84 @@ test_that("post-matchup games are excluded from FTY points", {
   expect_equal(pull(me, value, name)[["FTY Pts"]], 36)
 })
 
+badge_category_frame <- function() {
+  tibble(
+    competitor = c("Me", "Rival", "Me", "Rival", "Me", "Rival"),
+    name = c("pts", "pts", "ast", "ast", "tov", "tov"),
+    value = c(30, 7, 6, 1, 3, 2),
+    is_negative = c(FALSE, FALSE, FALSE, FALSE, TRUE, TRUE)
+  )
+}
+
+badge_points_frame <- function() {
+  tibble(
+    competitor = c("Me", "Rival", "Me", "Rival"),
+    name = c("FTY Pts", "FTY Pts", "pts", "pts"),
+    value = c(36.6, 36.4, 500, 400),
+    is_overall = c(TRUE, TRUE, FALSE, FALSE)
+  )
+}
+
+test_that("category badges count strict category wins", {
+  badges <- projected_badge_values(badge_category_frame(), points_league = FALSE)
+
+  expect_equal(badges, list(Me = 2L, Rival = 1L))
+})
+
+test_that("category badges skip ties and one-sided categories", {
+  tied <- badge_category_frame() |>
+    mutate(value = if_else(name == "ast", 6, value))
+
+  expect_equal(
+    projected_badge_values(tied, points_league = FALSE),
+    list(Me = 1L, Rival = 1L)
+  )
+
+  one_sided <- bind_rows(
+    badge_category_frame(),
+    tibble(competitor = "Me", name = "blk", value = 5, is_negative = FALSE)
+  )
+
+  expect_equal(
+    projected_badge_values(one_sided, points_league = FALSE),
+    list(Me = 2L, Rival = 1L)
+  )
+})
+
+test_that("category badges need two competitors", {
+  single <- filter(badge_category_frame(), competitor == "Me")
+
+  expect_null(projected_badge_values(single, points_league = FALSE))
+})
+
+test_that("points badges show the rounded overall total", {
+  expect_equal(
+    projected_badge_values(badge_points_frame(), points_league = TRUE),
+    list(Me = 37L, Rival = 36L)
+  )
+})
+
+test_that("badges read the plot frame produced by plot_data_prep", {
+  expect_equal(
+    projected_badge_values(category_prep(plot_fixture()), points_league = FALSE),
+    list(Me = 3L, Rival = 0L)
+  )
+
+  expect_equal(
+    projected_badge_values(points_prep(plot_fixture()), points_league = TRUE),
+    list(Me = 36L, Rival = 5L)
+  )
+})
+
+test_that("points badges still show for a single competitor", {
+  single <- filter(badge_points_frame(), competitor == "Me")
+
+  expect_equal(
+    projected_badge_values(single, points_league = TRUE),
+    list(Me = 37L)
+  )
+})
+
 test_that("postseason plot data combines completed matchups for one competitor", {
   matchup_one <- list(
     "1" = tibble(

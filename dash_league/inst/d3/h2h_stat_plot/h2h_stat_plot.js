@@ -6,6 +6,9 @@
 //   - reversed Set2 palette (scale_fill_brewer("Set2", direction = -1))
 //   - per-segment tooltip: hover a single stacked segment to see just
 //     that competitor's pre-formatted label string
+//   - a badge beside each competitor name: category wins in category
+//     leagues, projected FTY points in points leagues, from
+//     options.projected_badges keyed by competitor
 //
 // Layout: categories run top-to-bottom (one horizontal bar per category),
 // each bar's 0-1 stack proportion runs left-to-right.
@@ -279,7 +282,21 @@ r2d3.onRender(function(data, svg, width, height, options) {
   var labelBoxHeight = 34;
   var labelBoxY = margin.top - labelBoxHeight - 10; // sits in the top margin, 10px above the plot area
 
+  var labelBadgeHeight = 24;
+  var labelBadgeMinWidth = 24;
+  var labelBadgePadding = 6;
+  var labelBadgeGap = 8;
+  var labelBadgeFontSize = 15;
+
   labelsG.attr("transform", "translate(0,0)"); // boxes positioned in absolute svg coords below, not translated with the plot area
+
+  var badgeValues = (options && options.projected_badges) || null;
+
+  function badgeValueFor(competitor) {
+    if (badgeValues == null) return null;
+    if (!Object.prototype.hasOwnProperty.call(badgeValues, competitor)) return null;
+    return badgeValues[competitor];
+  }
 
   var labelItems = labelsG.selectAll("g.competitor-label")
     .data(labelBoxData, function(d) { return d.anchor; });
@@ -305,39 +322,113 @@ r2d3.onRender(function(data, svg, width, height, options) {
     .attr("text-anchor", "middle")
     .attr("dominant-baseline", "middle");
 
+  labelEnter.append("rect")
+    .attr("class", "label-badge-bg")
+    .attr("fill", "white")
+    .attr("stroke", "#000")
+    .attr("stroke-width", 1)
+    .attr("rx", 3)
+    .attr("height", labelBadgeHeight);
+
+  labelEnter.append("text")
+    .attr("class", "label-badge-text")
+    .style("font-size", labelBadgeFontSize + "px")
+    .style("font-family", "sans-serif")
+    .style("font-weight", "700")
+    .attr("fill", "#000")
+    .attr("text-anchor", "middle")
+    .attr("dominant-baseline", "middle");
+
   var labelMerged = labelEnter.merge(labelItems);
 
   // Text sets first, so its measured width can size and center the
   // background rect under it.
   labelMerged.select("text.label-box-text")
     .text(function(d) { return d.competitor; })
-    .attr("x", function(d) { return margin.left + proportionScale(d.xFrac); })
     .attr("y", labelBoxY + labelBoxHeight / 2);
 
   var labelMaxBoxWidth = Math.max(innerWidth - 8, 0); // 4px breathing room on each side
 
-  labelMerged.select("rect.label-box-bg")
-    .attr("y", labelBoxY)
-    .attr("width", function(d) {
-      // Measure the sibling text node just set above to size the box snugly,
-      // but never exceed the chart's own drawable width — an overlong name
-      // shouldn't be able to push the SVG's bounds outward and trigger a
-      // scrollbar on the containing card.
-      var textNode = d3.select(this.parentNode).select("text.label-box-text").node();
-      var naturalWidth = textNode.getBBox().width + labelBoxPadding * 2;
-      return Math.min(naturalWidth, labelMaxBoxWidth);
-    })
-    .attr("x", function(d) {
-      var textNode = d3.select(this.parentNode).select("text.label-box-text").node();
-      var naturalWidth = textNode.getBBox().width + labelBoxPadding * 2;
-      var boxWidth = Math.min(naturalWidth, labelMaxBoxWidth);
-      var idealX = margin.left + proportionScale(d.xFrac) - boxWidth / 2;
-      // Clamp so the box itself never sits outside [margin.left, margin.left + innerWidth].
-      return Math.max(margin.left, Math.min(idealX, margin.left + innerWidth - boxWidth));
-    });
+  labelMerged.each(function(d) {
+    var group = d3.select(this);
+    var nameText = group.select("text.label-box-text").node();
+    var box = group.select("rect.label-box-bg");
+    var badgeRect = group.select("rect.label-badge-bg");
+    var badgeText = group.select("text.label-badge-text");
+
+    var badgeValue = badgeValueFor(d.competitor);
+    var hasBadge = badgeValue != null;
+
+    badgeText.text(hasBadge ? String(badgeValue) : "");
+    badgeRect.attr("display", hasBadge ? null : "none");
+    badgeText.attr("display", hasBadge ? null : "none");
+
+    var badgeWidth = 0;
+    if (hasBadge) {
+      badgeWidth = Math.max(
+        labelBadgeMinWidth,
+        badgeText.node().getBBox().width + labelBadgePadding * 2
+      );
+    }
+
+    // Measure the name to size its box snugly, but never exceed the chart's
+    // drawable width — an overlong name shouldn't be able to push the SVG's
+    // bounds outward and trigger a scrollbar on the containing card. The
+    // badge takes its space out of the same budget.
+    var reserved = hasBadge ? badgeWidth + labelBadgeGap : 0;
+    var maxBoxWidth = Math.max(labelMaxBoxWidth - reserved, 0);
+    var boxWidth = Math.min(nameText.getBBox().width + labelBoxPadding * 2, maxBoxWidth);
+
+    var boxX = Math.max(
+      margin.left,
+      Math.min(
+        margin.left + proportionScale(d.xFrac) - boxWidth / 2,
+        margin.left + innerWidth - boxWidth
+      )
+    );
+
+    // Badges face the plot's centre: the left competitor's sits to the right
+    // of its name box, the right competitor's to the left.
+    var badgeOnRight = d.anchor !== "last";
+    var badgeX = badgeOnRight
+      ? boxX + boxWidth + labelBadgeGap
+      : boxX - labelBadgeGap - badgeWidth;
+
+    // Shift the box and badge together if the pair would cross a chart edge.
+    var groupLeft = hasBadge ? Math.min(boxX, badgeX) : boxX;
+    var groupRight = hasBadge ? Math.max(boxX + boxWidth, badgeX + badgeWidth) : boxX + boxWidth;
+    var shift = 0;
+    if (groupLeft < margin.left) {
+      shift = margin.left - groupLeft;
+    } else if (groupRight > margin.left + innerWidth) {
+      shift = margin.left + innerWidth - groupRight;
+    }
+    boxX += shift;
+    badgeX += shift;
+
+    box
+      .attr("y", labelBoxY)
+      .attr("width", boxWidth)
+      .attr("x", boxX);
+
+    d3.select(nameText)
+      .attr("x", boxX + boxWidth / 2)
+      .attr("y", labelBoxY + labelBoxHeight / 2);
+
+    if (hasBadge) {
+      badgeRect
+        .attr("x", badgeX)
+        .attr("y", labelBoxY + (labelBoxHeight - labelBadgeHeight) / 2)
+        .attr("width", badgeWidth)
+        .attr("height", labelBadgeHeight);
+      badgeText
+        .attr("x", badgeX + badgeWidth / 2)
+        .attr("y", labelBoxY + labelBoxHeight / 2);
+    }
+  });
 
   // Note: if a competitor name is long enough that its natural width
-  // exceeds labelMaxBoxWidth, the box clamps to the available width but
+  // exceeds maxBoxWidth, the box clamps to the available width but
   // the text itself may visually extend slightly past the box edge.
   // That's a cosmetic edge case — the box never exceeds the chart's
   // bounds, which is what was causing the page-level scrollbar.
